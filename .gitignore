@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.DS_Store
+
+# recordings — keep the repo light; docs/*.wav is generated
+*.wav
+*.mp3
+!docs/sample_*.mp3
