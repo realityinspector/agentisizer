@@ -51,10 +51,12 @@ KIND_STYLE = {
 
 # ── start ────────────────────────────────────────────────────────────────
 def cmd_start(args) -> int:
+    holder = {}
+
     def show(event: Event):
         style = KIND_STYLE.get(event.kind or "progress", "")
-        via = event.meta.get("via", "")
-        out(f"{style}{(event.kind or '?'):<9}[/] {event.text[:70]} [dim]{via}[/]")
+        key = holder["app"].conductor.snapshot()["key"] if "app" in holder else ""
+        out(f"{style}{(event.kind or '?'):<9}[/] {event.text[:62]} [cyan]{key}[/]")
 
     try:
         app = Agentisizer(
@@ -69,6 +71,7 @@ def cmd_start(args) -> int:
         out("  Run [bold]agentisizer setup[/] if you don't have Sonic Pi yet.")
         return 1
 
+    holder["app"] = app
     out("[bold cyan]The Agentisizer[/] — listening")
     for line in app.describe():
         out(f"  [dim]·[/] {line}")
@@ -146,8 +149,8 @@ def cmd_demo(args) -> int:
 
     conductor = Conductor(sonic, tuning=demo_tuning)
     interp = Interpreter(backend=args.backend, model=args.model)
-    healthy, detail = interp.health()
-    brain = detail if healthy else f"heuristic ({detail})"
+    healthy, detail, secs = interp.health()
+    brain = f"{detail} {secs:.2f}s" if healthy else f"heuristic ({detail})"
     out(f"[bold cyan]The Agentisizer[/] — demo  [dim]({brain})[/]")
     out("[dim]blocker ramp compressed to 22s so the alarm is audible; "
         "the default is 180s[/]\n")
@@ -165,7 +168,7 @@ def cmd_demo(args) -> int:
             snap = conductor.snapshot()
             out(f"[dim]{label:<14}[/] act {snap['activity']:.2f}  "
                 f"val {snap['valence']:+.2f}  ten {snap['tension']:.2f}  "
-                f"blk {snap['blocker']:.2f}")
+                f"blk {snap['blocker']:.2f}  [cyan]{snap['key']}[/]")
             if text:
                 ev = Event(text=text, source="demo", kind=kind)
                 if kind is None:
@@ -201,9 +204,16 @@ def cmd_doctor(args) -> int:
 
     out("\n[bold]Interpreter[/]")
     interp = Interpreter(backend=args.backend, model=args.model)
-    healthy, detail = interp.health()
-    if healthy:
-        out(f"  [green]✓[/] {detail}")
+    healthy, detail, secs = interp.health()
+    if healthy and secs > interp.SLOW_SECONDS:
+        # Working, but too slow to be worth using. Reasoning models land
+        # here: the sound would arrive long after the thing it describes.
+        out(f"  [yellow]![/] {detail} works but takes [bold]{secs:.1f}s[/] per event")
+        out(f"     [dim]too slow for live audio (budget {interp.SLOW_SECONDS}s) — "
+            f"events will fall back to keyword rules[/]")
+        out("     [dim]try a small non-reasoning model: ollama pull llama3.2:3b[/]")
+    elif healthy:
+        out(f"  [green]✓[/] {detail} [dim]({secs:.2f}s per event)[/]")
     elif interp.backend == "heuristic":
         out("  [yellow]![/] no model configured — using keyword rules")
         out("     [dim]set OPENROUTER_API_KEY, or run a local ollama[/]")
@@ -212,6 +222,13 @@ def cmd_doctor(args) -> int:
         # on purpose, so this is the only place it surfaces.
         out(f"  [yellow]![/] {interp.describe()} configured but [bold]not working[/]")
         out(f"     [dim]{detail}[/]")
+        if "Timeout" in detail:
+            # Almost always a reasoning model rather than a broken one: it
+            # spends its budget thinking before answering a one-word question.
+            out("     [dim]that usually means the model is too slow, not broken — "
+                "reasoning models\n     think before answering, which this "
+                "doesn't need[/]")
+            out("     [dim]try a small one: ollama pull llama3.2:3b[/]")
         out("     [dim]falling back to keyword rules — the soundtrack still runs[/]")
     probe = interp.interpret("all tests passed after the fix")
     out(f"  [dim]probe → {probe.kind} ({probe.intensity:.2f}) via {probe.via}[/]")

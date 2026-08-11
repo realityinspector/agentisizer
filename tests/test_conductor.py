@@ -24,8 +24,8 @@ class FakeSonic:
     def hit(self, kind):
         self.hits.append((time.time(), kind))
 
-    def state(self, a, v, t, b):
-        self.states.append((a, v, t, b))
+    def state(self, a, v, t, b, tonic=0, mode=4):
+        self.states.append((a, v, t, b, tonic, mode))
 
 
 def ev(text="x", kind="progress", intensity=0.5):
@@ -128,6 +128,27 @@ class TestBlockerEscalation(unittest.TestCase):
         self.assertLess(c.tension, peak)
 
 
+class TestHarmonyReachesTheEngine(unittest.TestCase):
+    """Mood has to actually move the key, not just the volume."""
+
+    def test_bad_news_darkens_the_mode_sent_to_sonic_pi(self):
+        sonic = FakeSonic()
+        c = Conductor(sonic)
+        c._tick()
+        calm_mode = sonic.states[-1][5]
+        for _ in range(10):
+            c.submit(ev(kind="bad", intensity=1.0))
+        c._tick()
+        self.assertGreater(sonic.states[-1][5], calm_mode,
+                           "trouble should send a darker mode index")
+
+    def test_key_is_reported_in_the_snapshot(self):
+        sonic = FakeSonic()
+        c = Conductor(sonic)
+        c._tick()
+        self.assertIn("dorian", c.snapshot()["key"])
+
+
 class TestBounds(unittest.TestCase):
     """Nothing may leave the range the engine expects."""
 
@@ -138,7 +159,7 @@ class TestBounds(unittest.TestCase):
             for _ in range(200):
                 c.submit(ev(kind=kind, intensity=1.0))
         c._tick()
-        a, v, t, b = sonic.states[-1]
+        a, v, t, b, _, _ = sonic.states[-1]
         self.assertGreaterEqual(a, 0.0); self.assertLessEqual(a, 1.0)
         self.assertGreaterEqual(v, -1.0); self.assertLessEqual(v, 1.0)
         self.assertGreaterEqual(t, 0.0); self.assertLessEqual(t, 1.0)

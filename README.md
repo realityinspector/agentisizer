@@ -33,6 +33,59 @@ minute. Then:
 | **blocked** | a low pulse that gets more insistent the longer it is ignored |
 | **resolved** | a falling figure lands on the root, tension drops away |
 
+And underneath all of it, the **key itself moves with the mood**.
+
+## Mood changes the harmony, not just the volume
+
+The modes of the major scale form a natural brightness ordering. Each step
+down flattens exactly one degree, so neighbouring modes differ by a single
+note and the shift is felt without being announced:
+
+```
+lydian  ·  ionian  ·  mixolydian  ·  dorian  ·  aeolian  ·  phrygian
+brightest ──────────────────────────────────────────────────► darkest
+```
+
+Good news walks up that ladder, trouble walks down it. Neutral rests in
+**dorian** — over hours, natural minor reads as mournful where dorian just
+reads as calm. Tension is weighted harder than valence, because a soundtrack
+that turns radiant the moment one test passes is one nobody believes.
+
+The payoff is at the dark end. Tension is voiced as a **flat second** against
+the root. In dorian that note is a chromatic outsider, fighting the key. In
+phrygian the flat second is *diatonic* — so as things get worse, the key
+moves to meet the dissonance, and the note that was fighting the harmony
+becomes the harmony. Trouble resolves into character rather than damage.
+
+This is measurable, not just intended. Chroma analysis of a recorded mood
+sweep, looking at the flat second's share of harmonic energy:
+
+| | bright mood | dark mood |
+| --- | --- | --- |
+| **A♯/B♭** (♭2 — phrygian's defining note) | 0.9% | **52.8%** |
+| G (♭7 — mixolydian's defining note) | 38.9% | — |
+| F (♭6 — phrygian) | — | 23.0% |
+
+A 58× change in the defining note. The mood is genuinely rewriting the
+harmony.
+
+The **key** moves too, but rarely: one step every eight minutes, only through
+closely related keys (A → D → C → E), and **never while tension is high** —
+modulating mid-crisis sounds like the floor moving. Python decides which key
+and mode the mood calls for; the engine holds the change until a phrase
+boundary, because *when* a key change lands is a timing decision and timing
+lives in Sonic Pi.
+
+`agentisizer start` prints the current key beside each event, so you can see
+the harmony track the narrative:
+
+```
+progress  refactoring the parser across nine files    A dorian
+bad       the fix broke authentication as well        A aeolian
+blocked   need the staging database password          A phrygian
+resolved  credentials received, deploy is green       A dorian
+```
+
 ## The part that actually matters
 
 Anyone can trigger a sound on an event. The hard part is building something a
@@ -80,6 +133,8 @@ new source is a small file instead of a rewrite.
   OpenRouter, a local Ollama, or keyword rules.
 - **`agentisizer/conductor.py`** — musical state, decay, spacing, escalation.
   The rules above live here.
+- **`agentisizer/musical.py`** — key and mode selection: the brightness
+  ladder, and the rules about when it is safe to modulate.
 - **`engine/engine.rb`** — runs *inside* Sonic Pi, permanently.
 
 ### Why the engine lives in Sonic Pi
@@ -174,15 +229,24 @@ the only place a degraded setup surfaces.
 - **Sonic Pi 4 or 5** — `./run-agentisizer.sh setup` will install and launch it
 - **Python 3.10–3.13** — the wrapper builds its own venv; 3.14 is not usable
   yet on Homebrew (broken `ensurepip`)
-- An LLM is **optional**
+- An LLM is **optional** — and if you use a local one, pick a small
+  non-reasoning model. Reasoning models spend their token budget thinking
+  before answering a one-word question, which is exactly the wrong trade
+  here: `ollama pull llama3.2:3b` rather than a 12B thinker.
 
 ## Status
 
 Alpha. The engine, conductor, both input modules, and the CLI work and are
 verified against Sonic Pi 5.0. Rough edges:
 
-- One musical key (A minor) and one 16-bar progression. Long sessions will
-  want more long-form variation than that.
+- The interpreter's LLM path is written and exercised, but every local model
+  tried so far has been too slow to use: a 12B reasoning model measured
+  27–80s per classification, against a 2.5s budget. `doctor` reports latency
+  and falls back to keyword rules. A small non-reasoning model should be
+  fine; that combination is not yet verified end to end.
+- Long-form variation is still thin. Key and mode move with mood, but there
+  is one progression shape per brightness region and no section structure
+  above the 16-bar phrase.
 - The cohesion supervisor is currently rules-only. The hooks for an LLM to
   propose bounded adjustments are in `Conductor.gain_trim` / `density_trim`,
   but nothing drives them yet.

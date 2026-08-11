@@ -34,6 +34,7 @@ from collections import deque
 from dataclasses import dataclass, field
 
 from .events import Event
+from .musical import Harmony, harmony_for
 
 
 # ── tuning. These are musical decisions, so they live together, named. ───
@@ -110,7 +111,9 @@ class Conductor:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._last_tick = time.time()
+        self._started = time.time()
         self.events_seen = 0
+        self.harmony = harmony_for(0.0, 0.0, 0.0)
 
         # Bounded trims the supervisor is allowed to set (see supervisor.py).
         self.gain_trim = 1.0        # 0.7 .. 1.15
@@ -192,8 +195,10 @@ class Conductor:
 
             a = min(self.t.max_activity, self.activity * self.density_trim) * self.gain_trim
             v, ten, blk = self.valence, self.tension, self.blocker
+            self.harmony = harmony_for(v, ten, now - self._started)
+            harmony = self.harmony
 
-        self.sonic.state(a, v, ten, blk)
+        self.sonic.state(a, v, ten, blk, harmony.tonic_offset, harmony.mode_index)
         if self.on_change:
             self.on_change(self.snapshot())
 
@@ -206,6 +211,7 @@ class Conductor:
             "events": self.events_seen,
             "blocked_for": (round(time.time() - self._blocked_since, 1)
                             if self._blocked_since else 0.0),
+            "key": self.harmony.name(),
         }
 
     def recent_events(self, n: int = 20) -> list[Event]:

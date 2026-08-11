@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -33,30 +34,22 @@ from dataclasses import dataclass
 from .events import KINDS
 
 
-SYSTEM_PROMPT = """\
-You are the ear of a system that turns software-agent activity into a live \
-background soundtrack, played through Sonic Pi. A human listens to this for \
-hours while working on something else, instead of reading agent transcripts.
-
-Classify the message into exactly one kind:
-
-  progress  - routine work happening; the common case. Reading files, running \
-a command, thinking. Nothing has succeeded or failed yet.
-  good      - something genuinely worked. Tests pass, a build is green, a fix \
-landed, a task completed.
-  bad       - something is wrong but work continues. A test failed, an error \
-was hit, a bug was found.
-  blocked   - work has STOPPED and needs a human. Waiting on input, missing \
-credentials, an unrecoverable failure, a question the agent cannot answer \
-alone. Use this sparingly; it triggers an escalating alarm.
-  resolved  - a previously bad or blocked situation has been cleared.
-
-Also give intensity from 0.0 to 1.0: how much this deserves the listener's \
-attention. Routine progress is 0.1-0.3. A passing test suite is around 0.6. \
-A production outage is 1.0.
-
-Reply with only a JSON object, no prose:
-{"kind": "...", "intensity": 0.0, "summary": "under 8 words"}"""
+# Kept deliberately short. Every token here is paid on *every* event, and on
+# a local model prompt evaluation dominates: the long teaching version of
+# this prompt measured 78s per call against gemma4:12b, the compact one 28s.
+# Neither is fast enough for live audio, which is the real lesson — but there
+# is no reason to make a fast model slow.
+SYSTEM_PROMPT = (
+    "Classify software-agent activity for a live soundtrack. "
+    "Reply with only JSON: {\"kind\":K,\"intensity\":N,\"summary\":S}\n"
+    "K is one of: progress (routine work, nothing decided yet) | "
+    "good (something worked) | bad (something failed, work continues) | "
+    "blocked (work STOPPED, needs a human) | "
+    "resolved (a bad or blocked thing is now fixed).\n"
+    "N is 0.0-1.0, how much attention it deserves: routine 0.2, "
+    "tests passing 0.6, production outage 1.0.\n"
+    "S is under 8 words."
+)
 
 
 @dataclass
@@ -203,46 +196,83 @@ class Interpreter:
                 backend = "heuristic"
 
         self.backend = backend
-        self.model = model or os.environ.get(
-            "AGENTISIZER_MODEL",
-            "anthropic/claude-haiku-4.5" if backend == "openrouter" else "llama3.2",
+        self.model = (
+            model
+            or os.environ.get("AGENTISIZER_MODEL")
+            or ("anthropic/claude-haiku-4.5" if backend == "openrouter"
+                else self._first_ollama_model() or "llama3.2:3b")
         )
 
-    def _ollama_alive(self) -> bool:
+    def _ollama_models(self) -> list[str]:
         try:
-            with urllib.request.urlopen(f"{self.ollama_host}/api/tags", timeout=1.5):
-                return True
+            with urllib.request.urlopen(f"{self.ollama_host}/api/tags", timeout=1.5) as r:
+                return [m["name"] for m in json.loads(r.read().decode()).get("models", [])]
         except Exception:
-            return False
+            return []
+
+    def _first_ollama_model(self) -> str | None:
+        """
+        Use a model that is actually installed.
+
+        Guessing a popular name and 404ing is a worse failure than picking
+        whatever is there: the user sees "not working" for a model they never
+        asked for. Prefer small ones — this is a one-word judgement, and big
+        reasoning models are far too slow for live audio.
+        """
+        models = self._ollama_models()
+        if not models:
+            return None
+        small = [m for m in models
+                 if re.search(r"[:\-](0\.5|1|1\.5|2|3|3\.8|4)b", m, re.I)]
+        return (small or models)[0]
+
+    def _ollama_alive(self) -> bool:
+        return bool(self._ollama_models())
 
     def describe(self) -> str:
         if self.backend == "heuristic":
             return "heuristic (no model configured)"
         return f"{self.backend}:{self.model}"
 
-    def health(self) -> tuple[bool, str]:
+    # Above this, a model is technically working but useless here: the sound
+    # would land long after the thing it describes. Reasoning models are the
+    # usual culprit — they spend their token budget thinking before
+    # answering, which is exactly the wrong trade for a one-word judgement.
+    SLOW_SECONDS = 2.5
+
+    def health(self, timeout: float | None = None) -> tuple[bool, str, float]:
         """
-        Actually call the model once and report what happened.
+        Actually call the model once and report what happened, and how long.
 
         `doctor` needs the truth, not the configuration. A stale API key
         still *looks* configured, and the fallback is quiet by design, so
         without this the system would degrade silently and tell you it was
         fine — which is worse than failing.
+
+        Latency is part of that truth. A classifier that takes thirty
+        seconds is not a working classifier for live audio.
         """
         if self.backend == "heuristic":
-            return False, "no model configured"
+            return False, "no model configured", 0.0
+
+        saved, self.timeout = self.timeout, (timeout or max(self.timeout, 30.0))
+        start = time.monotonic()
         try:
             raw = (self._call_openrouter("all tests passed")
                    if self.backend == "openrouter"
                    else self._call_ollama("all tests passed"))
         except urllib.error.HTTPError as e:
             body = e.read().decode(errors="replace")[:200]
-            return False, f"HTTP {e.code} — {body}"
+            return False, f"HTTP {e.code} — {body}", time.monotonic() - start
         except Exception as e:
-            return False, f"{type(e).__name__}: {e}"
+            return False, f"{type(e).__name__}: {e}", time.monotonic() - start
+        finally:
+            self.timeout = saved
+
+        elapsed = time.monotonic() - start
         if not raw or raw.get("kind") not in KINDS:
-            return False, f"unusable reply: {str(raw)[:120]}"
-        return True, f"{self.backend}:{self.model}"
+            return False, f"unusable reply: {str(raw)[:120]}", elapsed
+        return True, f"{self.backend}:{self.model}", elapsed
 
     def _call_openrouter(self, text: str) -> dict | None:
         data = _post_json(

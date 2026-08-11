@@ -34,16 +34,45 @@ set :tension,  0.0   # 0..1  accumulated problems
 set :blocker,  0.0   # 0..1  escalation while something is stuck
 set :bar,      0
 
-# Chord cycle: i – VI – III – VII in A minor. Four bars each, sixteen-bar
-# loop. Familiar enough to fade into the background, which is the point.
-PROG = (ring
-        [:a2, :minor7],
-        [:f2, :major7],
-        [:c3, :major7],
-        [:g2, :major7])
+# Harmony. Python decides which key and mode the mood calls for; we decide
+# when to move there. `want_*` is the request, the un-prefixed pair is what
+# is actually sounding, and the two only meet on a phrase line.
+set :want_tonic, 0
+set :want_mode,  4
+set :tonic,      0
+set :mode_i,     4
+set :last_arp,   0   # for voice leading — see nearest_tone
 
+HOME = :a2           # everything is an offset from here
+
+# Brightest to darkest. Each step down flattens exactly one degree, so
+# neighbouring modes differ by a single note and the shift is felt rather
+# than announced. Locrian is omitted: no perfect fifth, it sounds broken
+# rather than dark.
+MODES = (ring :lydian, :ionian, :mixolydian, :dorian, :aeolian, :phrygian)
+
+define :cur_mode do
+  MODES[get(:mode_i)]
+end
+
+define :cur_tonic do
+  note(HOME) + get(:tonic)
+end
+
+# Which scale degree the current bar sits on. Two progressions, because
+# i-VI-III-VII is idiomatic in the dark modes and limp in the bright ones,
+# where I-vi-IV-V is what the ear expects.
+define :cur_degree do
+  bright = get(:mode_i) <= 2
+  prog = bright ? [1, 6, 4, 5] : [1, 6, 3, 7]
+  prog[(get(:bar) / 4) % 4]
+end
+
+# The chord under everything right now, built from the mode itself rather
+# than from a hardcoded quality — so it is diatonic by construction whatever
+# mode we have drifted into.
 define :cur_chord do
-  PROG[(get(:bar) / 4) % 4]
+  chord_degree(cur_degree, cur_tonic, cur_mode, 4)
 end
 
 define :cur_root do
@@ -52,13 +81,32 @@ end
 
 # One place that turns "some number" into "a note that belongs here".
 define :tone_at do |n|
-  c = chord(cur_chord[0], cur_chord[1])
+  c = cur_chord
   c[n % c.length]
 end
 
-# ── clock: the only place the bar counter moves ──────────────────────────
+# Voice leading: of all the octaves of the chord tones available, take the
+# one closest to where the line just was. Without this the arpeggio leaps
+# arbitrarily and reads as data rather than as a melody.
+define :nearest_tone do |n, from|
+  target = tone_at(n)
+  best = target
+  [-24, -12, 0, 12, 24].each do |shift|
+    best = target + shift if (target + shift - from).abs < (best - from).abs
+  end
+  best
+end
+
+# ── clock: the only place the bar counter moves, and the only place the
+#    key is allowed to change. A modulation that lands mid-phrase sounds
+#    like a mistake; on the phrase line it sounds like the piece developing.
 live_loop :clock do
-  set :bar, get(:bar) + 1
+  b = get(:bar) + 1
+  set :bar, b
+  if b % 16 == 0
+    set :tonic,  get(:want_tonic)
+    set :mode_i, get(:want_mode)
+  end
   sleep 4
 end
 
@@ -70,6 +118,8 @@ live_loop :listen_state do
   set :valence,  v[1].to_f
   set :tension,  v[2].to_f
   set :blocker,  v[3].to_f
+  set :want_tonic, (v[4] || 0).to_i
+  set :want_mode,  (v[5] || 4).to_i
 end
 
 # ── input: one-shot events, quantised to the next beat by the loop grid ──
@@ -115,7 +165,9 @@ end
 # ── bed: always present, the thing you stop noticing ─────────────────────
 live_loop :bed do
   use_synth :hollow
-  ch = chord(cur_chord[0], cur_chord[1])
+  # Voiced an octave up: the bass owns everything below this, and two
+  # instruments sharing the bottom octave is the fastest way to mud.
+  ch = cur_chord.map { |n| n + 12 }
   with_fx :reverb, room: 0.85, mix: 0.5 do
     play ch,
       amp: 0.22,
@@ -167,7 +219,13 @@ live_loop :arp do
     use_synth :prophet
     steps = a > 0.6 ? 8 : 4
     steps.times do |i|
-      play tone_at(i + (get(:bar) % 3)),
+      # Step to the chord tone nearest the last one, rather than to whatever
+      # octave the chord happens to list. Small intervals read as a melody;
+      # arbitrary leaps read as data.
+      n = nearest_tone(i + (get(:bar) % 3), get(:last_arp))
+      n = tone_at(0) + 12 if (n - note(:a4)).abs > 18   # keep it in register
+      set :last_arp, n
+      play n,
         amp: (0.10 + (a * 0.16)) * duck,
         release: 0.25,
         cutoff: 70 + (a * 45),
@@ -185,7 +243,10 @@ live_loop :tension_layer do
   else
     use_synth :dsaw
     with_fx :reverb, room: 0.6, mix: 0.3 do
-      # minor second against the root: unmistakably wrong, still in key
+      # The flat second, an octave up. In Aeolian this is a chromatic
+      # outsider; in Phrygian it is diatonic — so as things worsen and the
+      # mode darkens, the key moves to meet this note and the dissonance
+      # becomes character rather than damage.
       play cur_root + 13,
         amp: 0.06 + (t * 0.14),
         release: 3.5,
@@ -205,13 +266,17 @@ live_loop :alarm do
   if b < 0.05
     sleep 2
   else
-    use_synth :chipbass
+    # tb303 rather than a chiptune blip: resonance carries urgency without
+    # the ice-pick top end you cannot listen to for ten minutes. The pitch
+    # stays on a chord tone, so even at full alarm it belongs to the key.
+    use_synth :tb303
     reps = b > 0.66 ? 4 : (b > 0.33 ? 2 : 1)
     reps.times do
       play tone_at(0) + (b > 0.66 ? 12 : 0),
-        amp: 0.10 + (b * 0.30),
-        release: 0.35,
-        cutoff: 80 + (b * 40)
+        amp: 0.09 + (b * 0.26),
+        release: 0.32,
+        cutoff: 70 + (b * 45),
+        res: 0.7 + (b * 0.25)
       sleep 0.25
     end
     # the gap shrinks as it escalates: patience running out
