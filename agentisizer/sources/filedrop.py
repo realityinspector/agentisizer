@@ -34,6 +34,25 @@ from ..events import Event
 DEFAULT_DIR = Path.home() / ".agentisizer" / "events"
 
 
+def ensure_dir(directory: Path | None = None) -> Path:
+    """
+    Create the drop directory.
+
+    Called from `setup` and `doctor`, not only when the daemon starts,
+    because the documented way to send an event is
+
+        echo "..." > ~/.agentisizer/events/$(date +%s%N).md
+
+    and on a machine where the daemon has never run that fails with "no such
+    file or directory". An integration path that only works after you have
+    already used the thing is not an integration path.
+    """
+    d = Path(directory or DEFAULT_DIR)
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "processed").mkdir(parents=True, exist_ok=True)
+    return d
+
+
 def parse_frontmatter(text: str) -> tuple[dict, str]:
     """
     Split optional `---` frontmatter from the body.
@@ -131,8 +150,7 @@ class FileDropSource:
                     pass
 
     def start(self) -> None:
-        self.dir.mkdir(parents=True, exist_ok=True)
-        self.processed.mkdir(parents=True, exist_ok=True)
+        ensure_dir(self.dir)
 
         def loop():
             while not self._stop.is_set():

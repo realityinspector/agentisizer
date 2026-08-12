@@ -71,7 +71,7 @@ and mode the mood calls for; the engine holds the change until a phrase
 boundary, because *when* a key change lands is a timing decision and timing
 lives in Sonic Pi.
 
-`agentisizer start` prints the current key beside each event, so you can see
+`./run-agentisizer.sh start` prints the current key beside each event, so you can see
 the harmony track the narrative:
 
 ```
@@ -206,7 +206,7 @@ Classification is a language judgement, so there is a model involved — but
 which decides *what* was chosen by measurement, not by preference.
 
 Benchmarked on twenty real agent phrasings, ten containing obvious keywords
-and ten deliberately without (`agentisizer bench` runs this):
+and ten deliberately without (`./run-agentisizer.sh bench` runs this):
 
 | | score | cost |
 | --- | --- | --- |
@@ -225,7 +225,7 @@ say. That beats either alone, and most events never reach the model at
 all — they are classified in microseconds, and the latency budget is spent
 only where it buys something.
 
-`agentisizer start` marks which decided: `·` rules, `~` model.
+`./run-agentisizer.sh start` marks which decided: `·` rules, `~` model.
 
 **The model classifies. It does not compose.** It returns one of five kinds
 and a number, and cannot reach the synth. Everything musical downstream is
@@ -258,7 +258,7 @@ the only place a degraded setup surfaces.
   yet on Homebrew (broken `ensurepip`)
 - An LLM is **optional** — the rules run alone perfectly well. If you want one,
   `ollama pull llama3.2:3b` is the verified setup; check it with
-  `agentisizer bench`.
+  `./run-agentisizer.sh bench`.
 
 ## Status
 

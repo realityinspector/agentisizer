@@ -41,7 +41,12 @@ cd agentisizer
 
 `run-agentisizer.sh` builds its own virtualenv on first use (~15s) and skips
 straight to the command after that. There is nothing to activate. Do not run
-`python main.py` or `pip install` yourself.
+`pip install` or invoke `python` yourself.
+
+**There is no bare `agentisizer` command** unless you `pip install .`
+deliberately. Every invocation is `./run-agentisizer.sh <command>` from the
+repo root. The CLI's own hints follow whatever you invoked it as, so you can
+copy them literally.
 
 Then leave it running in a background terminal:
 

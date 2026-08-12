@@ -59,4 +59,9 @@ if [[ "$(cat "$STAMP" 2>/dev/null)" != "$(shasum requirements.txt | awk '{print 
   shasum requirements.txt | awk '{print $1}' > "$STAMP"
 fi
 
+# Tell the CLI how it was actually invoked, so every hint it prints is a
+# command that exists. Without this it suggests `agentisizer …`, which is
+# only on PATH if the package was pip-installed — and the whole point of
+# this wrapper is that you never have to do that.
+export AGENTISIZER_CMD="${AGENTISIZER_CMD:-./run-agentisizer.sh}"
 exec "$VENV_PY" -m agentisizer.cli "$@"

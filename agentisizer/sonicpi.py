@@ -18,8 +18,10 @@ what each number is.
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
+import time
 from pathlib import Path
 from typing import NamedTuple
 
@@ -147,6 +149,29 @@ class SonicPi:
 
     def stop(self) -> None:
         self.run_code("stop")
+
+    def ping(self, timeout: float = 30.0) -> bool:
+        """
+        Prove Sonic Pi can actually *execute*, not merely that it is running.
+
+        The process appears in `ps` well before its OSC server will accept
+        anything, so a process check alone lets `setup` announce success into
+        silence — the worst possible first impression. This asks Sonic Pi to
+        write a file and waits for it, which is the same thing the user is
+        about to depend on.
+        """
+        import tempfile
+
+        probe = Path(tempfile.gettempdir()) / f"agentisizer_ping_{os.getpid()}"
+        probe.unlink(missing_ok=True)
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            self.run_code(f'File.write("{probe}", "ok")')
+            time.sleep(1.0)
+            if probe.exists():
+                probe.unlink(missing_ok=True)
+                return True
+        return False
 
     # ── the channel that actually carries the performance ────────────────
     def state(self, activity: float, valence: float, tension: float, blocker: float,

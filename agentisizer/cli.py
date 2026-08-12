@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -23,7 +24,12 @@ from .daemon import Agentisizer
 from .events import Event
 from .interpret import Interpreter, heuristic
 from .sonicpi import SonicPi, discover
-from .sources.filedrop import DEFAULT_DIR
+from .sources.filedrop import DEFAULT_DIR, ensure_dir
+
+
+# How this was invoked. The wrapper sets it; falls back to the installed
+# entry-point name for anyone who did pip install .
+CMD = os.environ.get("AGENTISIZER_CMD", "agentisizer")
 
 
 try:
@@ -72,7 +78,7 @@ def cmd_start(args) -> int:
         )
     except RuntimeError as e:
         out(f"[red]✗[/] {e}")
-        out("  Run [bold]agentisizer setup[/] if you don't have Sonic Pi yet.")
+        out(f"  Run [bold]{CMD} setup[/] if you don't have Sonic Pi yet.")
         return 1
 
     holder["app"] = app
@@ -114,7 +120,7 @@ def cmd_say(args) -> int:
         # No daemon listening — fall back to the file drop, which a later
         # `start` will pick up. Losing an event to a typo'd port is worse
         # than delivering it late.
-        DEFAULT_DIR.mkdir(parents=True, exist_ok=True)
+        ensure_dir()
         path = DEFAULT_DIR / f"{int(time.time()*1000)}.json"
         path.write_text(json.dumps(payload))
         out(f"[yellow]![/] nothing listening on :{args.port} — dropped to {path.name}")
@@ -140,7 +146,7 @@ DEMO = [
 def cmd_demo(args) -> int:
     sonic = SonicPi.connect()
     if sonic is None:
-        out("[red]✗[/] Sonic Pi is not running. Try [bold]agentisizer setup[/].")
+        out(f"[red]✗[/] Sonic Pi is not running. Try [bold]{CMD} setup[/].")
         return 1
 
     from .conductor import Conductor
@@ -204,7 +210,7 @@ def cmd_doctor(args) -> int:
     else:
         ok = False
         out("  [red]✗[/] not running")
-        out("     [dim]open the app, or run: agentisizer setup[/]")
+        out(f"     [dim]open the app, or run: {CMD} setup[/]")
 
     out("\n[bold]Interpreter[/]")
     interp = Interpreter(backend=args.backend, model=args.model)
@@ -245,12 +251,13 @@ def cmd_doctor(args) -> int:
     out(f"  [dim]probe → {probe.kind} ({probe.intensity:.2f}) via {probe.via}[/]")
 
     out("\n[bold]Inputs[/]")
-    out(f"  [dim]·[/] file drop: {DEFAULT_DIR}")
+    ensure_dir()          # so the documented echo-to-a-file works right now
+    out(f"  [green]✓[/] file drop ready: {DEFAULT_DIR}")
     out(f"  [dim]·[/] http: 127.0.0.1:{args.port}")
 
     out("")
-    out("[green]✓ ready[/]  try: [bold]agentisizer demo[/]" if ok
-        else "[yellow]! see above[/]")
+    out(f"[green]✓ ready[/]  try: [bold]{CMD} demo[/]" if ok
+        else f"[yellow]! see above[/] — then: [bold]{CMD} doctor[/]")
     return 0 if ok else 1
 
 
@@ -286,9 +293,7 @@ def cmd_setup(args) -> int:
         if not app.exists():
             return 1
 
-    if discover():
-        out("[green]✓[/] Sonic Pi is running")
-    else:
+    if not discover():
         out("[yellow]![/] Sonic Pi is installed but not running — opening it")
         subprocess.call(["open", "-a", "Sonic Pi"])
         out("  [dim]waiting for it to boot…[/]")
@@ -296,18 +301,28 @@ def cmd_setup(args) -> int:
             time.sleep(1.5)
             if discover():
                 break
-        if discover():
-            out("[green]✓[/] booted")
-        else:
-            out("[red]✗[/] still not reachable — open it by hand and re-run doctor")
-            return 1
 
-    out("\n[green]✓ ready[/]  try: [bold]agentisizer demo[/]")
+    if not discover():
+        out("[red]✗[/] Sonic Pi did not start — open it by hand, then re-run")
+        return 1
+
+    # The process existing is not the same as it being able to run code, and
+    # announcing success into silence is the worst possible first impression.
+    out("  [dim]checking it can actually run code…[/]")
+    sonic = SonicPi.connect()
+    if sonic is None or not sonic.ping(timeout=45):
+        out("[red]✗[/] Sonic Pi is running but not accepting code yet")
+        out("  [dim]give it a moment and re-run; if it persists, check[/]")
+        out("  [dim]~/.sonic-pi/log/spider.log[/]")
+        return 1
+    out("[green]✓[/] Sonic Pi is running and responding")
+
+    out(f"\n[green]✓ ready[/]  try: [bold]{CMD} demo[/]")
     return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="agentisizer", description="Hear what your agents are doing.")
+    p = argparse.ArgumentParser(prog=CMD, description="Hear what your agents are doing.")
     p.add_argument("--backend", default="auto",
                    choices=["auto", "openrouter", "ollama", "heuristic"],
                    help="which brain classifies messages (default: auto)")
@@ -340,6 +355,9 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     if not args.cmd:
         parser.print_help()
+        out("")
+        out(f"[dim]New here? Run[/] [bold]{CMD} setup[/][dim], then[/] "
+            f"[bold]{CMD} demo[/][dim].[/]")
         return 0
     return {
         "start": cmd_start,
