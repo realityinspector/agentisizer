@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 300" width="880" height="300" font-family="ui-sans-serif,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="patch" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#a78bfa"/>
+    </linearGradient>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <rect width="880" height="300" rx="14" fill="#0d1117"/>
+
+  <text x="28" y="38" fill="#e5e7eb" font-size="16" font-weight="700">Signal flow</text>
+  <text x="28" y="60" fill="#94a3b8" font-size="12.5">Sources know nothing about music. The musical side never learns where an event came from.</text>
+
+  <!-- sources -->
+  <rect x="28" y="88" width="176" height="150" rx="10" fill="#111c2e" stroke="#1f2f47"/>
+  <text x="44" y="112" fill="#22d3ee" font-size="11" font-weight="700" letter-spacing="1.2">SOURCES</text>
+  <text x="44" y="140" fill="#cbd5e1" font-size="13">Claude Code hooks</text>
+  <text x="44" y="164" fill="#cbd5e1" font-size="13">file drop (.md/.json)</text>
+  <text x="44" y="188" fill="#cbd5e1" font-size="13">localhost HTTP</text>
+  <text x="44" y="216" fill="#64748b" font-size="12" font-style="italic">…any stream with meaning</text>
+
+  <!-- interpreter -->
+  <rect x="248" y="88" width="168" height="150" rx="10" fill="#111c2e" stroke="#1f2f47"/>
+  <text x="264" y="112" fill="#22d3ee" font-size="11" font-weight="700" letter-spacing="1.2">INTERPRET</text>
+  <text x="264" y="140" fill="#cbd5e1" font-size="13">keyword rules first</text>
+  <text x="264" y="164" fill="#cbd5e1" font-size="13">model where they</text>
+  <text x="264" y="181" fill="#cbd5e1" font-size="13">shrug</text>
+  <text x="264" y="210" fill="#64748b" font-size="12">→ one of 5 kinds</text>
+  <text x="264" y="228" fill="#64748b" font-size="12">+ an intensity</text>
+
+  <!-- conductor -->
+  <rect x="460" y="88" width="168" height="150" rx="10" fill="#111c2e" stroke="#1f2f47"/>
+  <text x="476" y="112" fill="#22d3ee" font-size="11" font-weight="700" letter-spacing="1.2">CONDUCTOR</text>
+  <text x="476" y="140" fill="#cbd5e1" font-size="13">decay · spacing</text>
+  <text x="476" y="164" fill="#cbd5e1" font-size="13">escalation · key</text>
+  <text x="476" y="192" fill="#64748b" font-size="12">the listenability</text>
+  <text x="476" y="210" fill="#64748b" font-size="12">rules live here</text>
+
+  <!-- engine -->
+  <rect x="672" y="88" width="180" height="150" rx="10" fill="#131426" stroke="#3b2f63"/>
+  <text x="688" y="112" fill="#a78bfa" font-size="11" font-weight="700" letter-spacing="1.2">SONIC PI</text>
+  <text x="688" y="140" fill="#cbd5e1" font-size="13">engine.rb, running</text>
+  <text x="688" y="157" fill="#cbd5e1" font-size="13">permanently</text>
+  <text x="688" y="185" fill="#64748b" font-size="12">timing comes from</text>
+  <text x="688" y="203" fill="#64748b" font-size="12">its scheduler, not</text>
+  <text x="688" y="221" fill="#64748b" font-size="12">a Python loop</text>
+
+  <!-- patch cables -->
+  <path d="M204 150 C226 150 226 150 248 150" stroke="url(#patch)" stroke-width="2.5" fill="none" marker-end="url(#a)"/>
+  <path d="M416 150 C438 150 438 150 460 150" stroke="url(#patch)" stroke-width="2.5" fill="none" marker-end="url(#a)"/>
+  <path d="M628 150 C650 150 650 150 672 150" stroke="url(#patch)" stroke-width="2.5" fill="none" marker-end="url(#a)"/>
+
+  <text x="322" y="270" fill="#475569" font-size="11.5" text-anchor="middle">Event</text>
+  <text x="534" y="270" fill="#475569" font-size="11.5" text-anchor="middle">kind + intensity</text>
+  <text x="746" y="270" fill="#475569" font-size="11.5" text-anchor="middle">OSC state, ~4×/sec</text>
+</svg>

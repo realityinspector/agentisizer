@@ -282,6 +282,19 @@ class Interpreter:
             return False, "no model configured", 0.0
 
         saved, self.timeout = self.timeout, (timeout or max(self.timeout, 30.0))
+
+        # Warm up first, and time the second call. Ollama unloads a model
+        # after a few idle minutes, so a cold call measures disk-to-GPU load
+        # rather than classification: llama3.2:3b timed 12.9s cold against
+        # 2.1s warm. Reporting the cold number condemns a usable model.
+        try:
+            if self.backend == "openrouter":
+                self._call_openrouter("warmup")
+            else:
+                self._call_ollama("warmup")
+        except Exception:
+            pass
+
         start = time.monotonic()
         try:
             raw = (self._call_openrouter("all tests passed")

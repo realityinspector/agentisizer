@@ -19,6 +19,11 @@ stream with semantics — APIs, market data, build pipelines, sensors.
 ./run-agentisizer.sh start     # leave it running
 ```
 
+<img src="docs/flow.svg" alt="Signal flow: sources patch into an interpreter, a conductor, and a Sonic Pi engine running permanently" width="100%">
+
+🎧 **[Hear it](docs/sample_demo.mp3)** — a 73-second run through calm, work,
+good news, trouble, a blocker escalating, and relief.
+
 ## What it sounds like
 
 A subtle four-on-the-floor bed, always there, that you stop noticing within a
@@ -37,14 +42,11 @@ And underneath all of it, the **key itself moves with the mood**.
 
 ## Mood changes the harmony, not just the volume
 
+<img src="docs/modes.svg" alt="The modal brightness ladder from lydian to phrygian, with neutral resting at dorian, and measured chroma showing the flat second at 0.9% bright versus 52.8% dark" width="100%">
+
 The modes of the major scale form a natural brightness ordering. Each step
 down flattens exactly one degree, so neighbouring modes differ by a single
-note and the shift is felt without being announced:
-
-```
-lydian  ·  ionian  ·  mixolydian  ·  dorian  ·  aeolian  ·  phrygian
-brightest ──────────────────────────────────────────────────► darkest
-```
+note and the shift is felt without being announced.
 
 Good news walks up that ladder, trouble walks down it. Neutral rests in
 **dorian** — over hours, natural minor reads as mournful where dorian just
@@ -57,17 +59,10 @@ phrygian the flat second is *diatonic* — so as things get worse, the key
 moves to meet the dissonance, and the note that was fighting the harmony
 becomes the harmony. Trouble resolves into character rather than damage.
 
-This is measurable, not just intended. Chroma analysis of a recorded mood
-sweep, looking at the flat second's share of harmonic energy:
-
-| | bright mood | dark mood |
-| --- | --- | --- |
-| **A♯/B♭** (♭2 — phrygian's defining note) | 0.9% | **52.8%** |
-| G (♭7 — mixolydian's defining note) | 38.9% | — |
-| F (♭6 — phrygian) | — | 23.0% |
-
-A 58× change in the defining note. The mood is genuinely rewriting the
-harmony.
+This is measurable, not just intended — the chroma figures above come from
+analysing a recorded mood sweep. Mixolydian's ♭7 carried 38.9% of the bright
+segment; phrygian's ♭6 carried 23.0% of the dark one. The mood is genuinely
+rewriting the harmony.
 
 The **key** moves too, but rarely: one step every eight minutes, only through
 closely related keys (A → D → C → E), and **never while tension is high** —
@@ -112,6 +107,8 @@ stops hearing any of it within twenty minutes and the whole thing is pointless.
 problem that resolves itself in thirty seconds never becomes a siren. Once you
 fix it, the alarm is gone in seven. An alarm that nags after the fix is the
 one you mute.
+
+<img src="docs/alarm.svg" alt="Alarm urgency over time: a slow linear ramp over three minutes while blocked, then a fast decay to zero within seconds of being resolved" width="100%">
 
 **Bad news is dissonant *within the key*.** A flat second reads as tension
 because the ear can place it — not because it hurts.
@@ -181,6 +178,10 @@ curl -s localhost:8912/state
 ```
 
 `kind` is optional everywhere. Leave it out and the interpreter decides.
+
+> **Working on this with an AI agent?** [`AGENTS.md`](AGENTS.md) has setup,
+> the semantics of each `kind`, integration patterns, and the etiquette that
+> keeps the soundtrack informative.
 
 ### Claude Code
 

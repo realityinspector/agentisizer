@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 336" width="880" height="336" font-family="ui-sans-serif,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f87171" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#f87171" stop-opacity="0.02"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="880" height="336" rx="14" fill="#0d1117"/>
+
+  <text x="28" y="38" fill="#e5e7eb" font-size="16" font-weight="700">Alarms rise slowly and fall fast</text>
+  <text x="28" y="60" fill="#94a3b8" font-size="12.5">A blocker that resolves itself never becomes a siren. Once you fix it, the alarm gets out of the way.</text>
+
+  <!-- axes -->
+  <line x1="72" y1="240" x2="836" y2="240" stroke="#1f2f47" stroke-width="1.5"/>
+  <line x1="72" y1="96"  x2="72"  y2="240" stroke="#1f2f47" stroke-width="1.5"/>
+  <text x="60" y="102" fill="#475569" font-size="11" text-anchor="end">1.0</text>
+  <text x="60" y="244" fill="#475569" font-size="11" text-anchor="end">0</text>
+  <text x="52" y="175" fill="#475569" font-size="11" text-anchor="middle" transform="rotate(-90 52 175)">urgency</text>
+
+  <!-- gridlines -->
+  <line x1="72" y1="168" x2="836" y2="168" stroke="#16202f" stroke-width="1" stroke-dasharray="3 5"/>
+
+  <!-- the curve: slow linear ramp, then fast exponential decay -->
+  <path d="M72 240 L112 240 L520 96 L560 96 C575 96 585 150 596 196 C604 226 612 238 628 240 L836 240 Z"
+        fill="url(#fill)"/>
+  <path d="M72 240 L112 240 L520 96 L560 96 C575 96 585 150 596 196 C604 226 612 238 628 240 L836 240"
+        stroke="#f87171" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
+
+  <!-- event markers -->
+  <line x1="112" y1="88" x2="112" y2="240" stroke="#f87171" stroke-width="1" stroke-dasharray="4 4" opacity="0.6"/>
+  <circle cx="112" cy="240" r="4.5" fill="#f87171"/>
+  <text x="118" y="82" fill="#f87171" font-size="12" font-weight="700">blocked</text>
+  <text x="118" y="98" fill="#64748b" font-size="11">barely audible</text>
+
+  <line x1="560" y1="88" x2="560" y2="240" stroke="#4ade80" stroke-width="1" stroke-dasharray="4 4" opacity="0.6"/>
+  <circle cx="560" cy="96" r="4.5" fill="#4ade80"/>
+  <text x="568" y="82" fill="#4ade80" font-size="12" font-weight="700">resolved</text>
+
+  <!-- spans -->
+  <path d="M112 262 L520 262" stroke="#475569" stroke-width="1"/>
+  <path d="M112 258 L112 266 M520 258 L520 266" stroke="#475569" stroke-width="1"/>
+  <text x="316" y="280" fill="#94a3b8" font-size="12" text-anchor="middle">ramps over 3 minutes — patience while it persists</text>
+
+  <path d="M560 262 L628 262" stroke="#475569" stroke-width="1"/>
+  <path d="M560 258 L560 266 M628 258 L628 266" stroke="#475569" stroke-width="1"/>
+  <text x="594" y="280" fill="#94a3b8" font-size="12">gone in 7s — relief is prompt</text>
+
+  <!-- what changes as it climbs -->
+  <text x="200" y="140" fill="#64748b" font-size="11.5">the gap shrinks · it climbs an octave</text>
+  <text x="200" y="158" fill="#64748b" font-size="11.5">the arp ducks to make room</text>
+
+  <text x="28" y="306" fill="#475569" font-size="11.5">From a live run: 0.00 → 0.35 → 0.71 → 1.00 climbing, then 1.00 → 0.27 → 0.00 once cleared.</text>
+  <text x="28" y="322" fill="#475569" font-size="11.5">It stays on a chord tone throughout, so even at full alarm it still belongs to the key.</text>
+</svg>

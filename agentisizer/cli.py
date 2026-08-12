@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import time
 import urllib.request
@@ -208,15 +209,22 @@ def cmd_doctor(args) -> int:
     out("\n[bold]Interpreter[/]")
     interp = Interpreter(backend=args.backend, model=args.model)
     healthy, detail, secs = interp.health()
-    if healthy and secs > interp.SLOW_SECONDS:
-        # Working, but too slow to be worth using. Reasoning models land
-        # here: the sound would arrive long after the thing it describes.
-        out(f"  [yellow]![/] {detail} works but takes [bold]{secs:.1f}s[/] per event")
-        out(f"     [dim]too slow for live audio (budget {interp.SLOW_SECONDS}s) — "
-            f"events will fall back to keyword rules[/]")
-        out("     [dim]try a small non-reasoning model: ollama pull llama3.2:3b[/]")
+    if healthy and secs > interp.timeout:
+        # Slower than we will wait for. These calls time out and the rules
+        # answer instead, so the model is contributing nothing.
+        out(f"  [red]✗[/] {detail} takes [bold]{secs:.1f}s[/] — over the "
+            f"{interp.timeout:.0f}s timeout, so it never gets used")
+        if not re.search(r"[:\-](0\.5|1|1\.5|2|3|3\.8|4)b", interp.model, re.I):
+            out("     [dim]reasoning models think before answering, which this "
+                "doesn't need\n     try: ollama pull llama3.2:3b[/]")
+    elif healthy and secs > interp.SLOW_SECONDS:
+        # Slower than ideal but still useful, because the rules go first and
+        # the model is only asked about the minority they can't place.
+        out(f"  [green]✓[/] {detail} [dim]({secs:.1f}s per call)[/]")
+        out(f"     [dim]slower than the {interp.SLOW_SECONDS}s ideal, but the rules "
+            f"answer first — most\n     events are instant and never reach it[/]")
     elif healthy:
-        out(f"  [green]✓[/] {detail} [dim]({secs:.2f}s per event)[/]")
+        out(f"  [green]✓[/] {detail} [dim]({secs:.2f}s per call)[/]")
     elif interp.backend == "heuristic":
         out("  [yellow]![/] no model configured — using keyword rules")
         out("     [dim]set OPENROUTER_API_KEY, or run a local ollama[/]")
