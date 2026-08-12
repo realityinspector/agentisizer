@@ -1,3 +1,5 @@
+<img src="docs/logo.svg" width="128" align="right" alt="A small synthesiser module whose knobs are eyes and whose oscilloscope is a smile">
+
 # The Agentisizer
 
 **Hear what your agents are doing.**
@@ -18,6 +20,8 @@ stream with semantics — APIs, market data, build pipelines, sensors.
 ./run-agentisizer.sh demo      # 90-second tour of every state
 ./run-agentisizer.sh start     # leave it running
 ```
+
+<br clear="right">
 
 <img src="docs/flow.svg" alt="Signal flow: sources patch into an interpreter, a conductor, and a Sonic Pi engine running permanently" width="100%">
 
