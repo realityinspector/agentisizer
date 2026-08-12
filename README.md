@@ -26,8 +26,8 @@ good news, trouble, a blocker escalating, and relief.
 
 ## What it sounds like
 
-A subtle four-on-the-floor bed, always there, that you stop noticing within a
-minute. Then:
+A slow pad that never stops, quiet enough that you stop noticing it within a
+minute. Everything else arrives only when there is something to say:
 
 | What happened | What you hear |
 | --- | --- |
@@ -75,11 +75,13 @@ lives in Sonic Pi.
 the harmony track the narrative:
 
 ```
-progress  refactoring the parser across nine files    A dorian
-bad       the fix broke authentication as well        A aeolian
-blocked   need the staging database password          A phrygian
-resolved  credentials received, deploy is green       A dorian
+progress  · refactoring the parser across nine files   A dorian
+bad       ~ the fix broke authentication as well       A aeolian
+blocked   · need the staging database password         A phrygian
+resolved  · credentials received, deploy is green      A dorian
 ```
+
+(`·` means the keyword rules decided, `~` means it went to the model.)
 
 ## The part that actually matters
 
@@ -132,13 +134,16 @@ new source is a small file instead of a rewrite.
   The rules above live here.
 - **`agentisizer/musical.py`** — key and mode selection: the brightness
   ladder, and the rules about when it is safe to modulate.
+- **`agentisizer/sources/`** — one file per input. `filedrop.py` is ~100 lines
+  and does nothing clever; copy it to add your own.
 - **`engine/engine.rb`** — runs *inside* Sonic Pi, permanently.
 
 ### Why the engine lives in Sonic Pi
 
-Python sends **state**, not notes. `/run-code` is used exactly twice — to load
-the engine and to stop it. Everything after that is OSC cues to a program
-that is already running and listening.
+Python sends **state**, not notes. `/run-code` carries whole programs and is
+used three times in a session: to load the engine, to stop it, and once during
+`setup` to check Sonic Pi can actually execute. Everything else — every event,
+for hours — is an OSC cue to a program already running and listening.
 
 That means timing comes from Sonic Pi's scheduler rather than from a Python
 loop with `sleep()` in it. Notes land on the beat because a real sequencer is
@@ -150,7 +155,7 @@ machine gun.
 **Any language, no client library** — write a file:
 
 ```bash
-echo "all tests passed" > ~/.agentisizer/events/$(date +%s).md
+echo "all tests passed" > ~/.agentisizer/events/$(date +%s%N).md
 ```
 
 With frontmatter, if the agent already knows what it is reporting:
@@ -225,8 +230,6 @@ say. That beats either alone, and most events never reach the model at
 all — they are classified in microseconds, and the latency budget is spent
 only where it buys something.
 
-`./run-agentisizer.sh start` marks which decided: `·` rules, `~` model.
-
 **The model classifies. It does not compose.** It returns one of five kinds
 and a number, and cannot reach the synth. Everything musical downstream is
 bounded by the conductor. A bad classification makes the soundtrack briefly
@@ -249,7 +252,41 @@ here. `llama3.2:3b` is the reference.
 
 `doctor` makes a real call rather than reporting configuration — a stale API
 key still looks configured, and the fallback is silent by design, so this is
-the only place a degraded setup surfaces.
+the only place a degraded setup surfaces. It warms the model first and times
+the *second* call, because Ollama unloads idle models and a cold call measures
+disk-to-GPU load rather than classification.
+
+With `--backend auto` (the default) the runners-up are kept. If the first
+choice fails twice it demotes to the next, so an expired `OPENROUTER_API_KEY`
+cannot shadow a working local model — which it did, until it was caught:
+
+```
+HTTP 401 — {"error":{"message":"User not found."}} — trying ollama
+✓ ollama:llama3.2:3b (1.93s per call)
+```
+
+## Commands
+
+Everything runs through the wrapper. There is no bare `agentisizer` on your
+PATH unless you `pip install .` deliberately — the wrapper builds and uses its
+own virtualenv, so there is nothing to activate.
+
+| | |
+| --- | --- |
+| `./run-agentisizer.sh setup` | install Sonic Pi if needed, launch it, verify it responds |
+| `./run-agentisizer.sh doctor` | check each layer and say which one is broken |
+| `./run-agentisizer.sh demo` | 90-second tour of every state (`--record FILE` to keep it) |
+| `./run-agentisizer.sh start` | run the soundtrack until you stop it |
+| `./run-agentisizer.sh say "..."` | send one event (`--kind`, `--intensity`, `--source`) |
+| `./run-agentisizer.sh bench` | score the classifier against the keyword rules |
+| `./run-agentisizer.sh test` | run the test suite |
+
+Global flags: `--backend {auto,openrouter,ollama,heuristic}`, `--model NAME`,
+`--port N`.
+
+First run builds the virtualenv (~15s); after that it goes straight to the
+command. `setup` and `doctor` also create `~/.agentisizer/events/`, so the
+file-drop integration works before the daemon has ever run.
 
 ## Requirements
 
@@ -262,12 +299,15 @@ the only place a degraded setup surfaces.
 
 ## Status
 
-Alpha. The engine, conductor, both input modules, and the CLI work and are
-verified against Sonic Pi 5.0. Rough edges:
+Alpha, and honest about it. The engine, conductor, both input modules and the
+CLI work and are verified against Sonic Pi 5.0 — every number in this README
+was measured on a real run, and `tools/check_docs.py` runs with the tests so
+the commands and paths here cannot drift from the code. Rough edges:
 
 - The model still misses things the rules do too — "that did it" reads as
-  `progress`, not `good`. 16/20 is a floor, not a ceiling; `agentisizer
-  bench` is there to make improvements measurable rather than felt.
+  `progress`, not `good`. 16/20 is a floor, not a ceiling;
+  `./run-agentisizer.sh bench` is there to make improvements measurable
+  rather than felt.
 - OpenRouter is implemented but has only been exercised against a dead key.
   The local path is the verified one.
 - Long-form variation is still thin. Key and mode move with mood, but there
@@ -276,6 +316,10 @@ verified against Sonic Pi 5.0. Rough edges:
 - The cohesion supervisor is currently rules-only. The hooks for an LLM to
   propose bounded adjustments are in `Conductor.gain_trim` / `density_trim`,
   but nothing drives them yet.
+- `setup` installs Sonic Pi through Homebrew. That branch is the one path
+  not exercised here, since verifying it would mean uninstalling a working
+  copy — if `brew install --cask sonic-pi` misbehaves you are on your own for
+  a moment, and everything after it is tested.
 - Only tested on macOS.
 
 ## Licence

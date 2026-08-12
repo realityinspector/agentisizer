@@ -6,6 +6,8 @@ Command line for The Agentisizer.
     agentisizer demo           90-second tour of every musical state
     agentisizer doctor         what's working, what isn't
     agentisizer setup          get Sonic Pi installed and running
+    agentisizer bench          measure the classifier against the keyword rules
+    agentisizer test           run the test suite
 """
 
 from __future__ import annotations
@@ -271,6 +273,14 @@ def cmd_doctor(args) -> int:
     return 0 if ok else 1
 
 
+def cmd_test(args) -> int:
+    """Run the suite. Documented in AGENTS.md, so it has to exist here."""
+    import subprocess
+    root = Path(__file__).resolve().parent.parent
+    return subprocess.call(
+        [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"], cwd=root)
+
+
 def cmd_bench(args) -> int:
     """Is the model actually earning its latency? Measure, don't assume."""
     from pathlib import Path as _P
@@ -354,6 +364,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("doctor", help="check the setup")
     sub.add_parser("bench", help="measure the classifier against the keyword rules")
+    sub.add_parser("test", help="run the test suite")
     s = sub.add_parser("setup", help="install and launch Sonic Pi")
     s.add_argument("--yes", action="store_true", help="don't ask before installing")
 
@@ -375,6 +386,7 @@ def main(argv=None) -> int:
         "demo": cmd_demo,
         "doctor": cmd_doctor,
         "bench": cmd_bench,
+        "test": cmd_test,
         "setup": cmd_setup,
     }[args.cmd](args)
 
