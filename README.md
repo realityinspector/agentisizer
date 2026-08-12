@@ -1,4 +1,4 @@
-<img src="docs/logo.svg" width="128" align="right" alt="A small synthesiser module whose knobs are eyes and whose oscilloscope is a smile">
+<img src="docs/logo.svg" width="128" align="right" alt="A synthesiser module: an oscilloscope tracing an ADSR envelope above four sliders, in a walnut case">
 
 # The Agentisizer
 

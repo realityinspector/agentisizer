@@ -1,59 +1,80 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240" role="img" aria-label="The Agentisizer: a small synthesiser module whose knobs are eyes and whose oscilloscope is a smile">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240" role="img" aria-label="The Agentisizer: a synthesiser module with an oscilloscope tracing an ADSR envelope above four sliders">
   <defs>
-    <linearGradient id="cableL" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#4ade80"/>
+    <linearGradient id="walnut" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7a4f2a"/>
+      <stop offset="0.5" stop-color="#5d3a1d"/>
+      <stop offset="1" stop-color="#452a14"/>
     </linearGradient>
-    <linearGradient id="cableR" x1="1" y1="1" x2="0" y2="0">
-      <stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#f472b6"/>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#22262e"/>
+      <stop offset="1" stop-color="#14171c"/>
     </linearGradient>
-    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1b2740"/><stop offset="1" stop-color="#131c2f"/>
+    <linearGradient id="crt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#07160e"/>
+      <stop offset="1" stop-color="#040d08"/>
     </linearGradient>
-    <linearGradient id="knob" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#f1f5f9"/><stop offset="1" stop-color="#cbd5e1"/>
+    <linearGradient id="cap" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f2ead9"/>
+      <stop offset="1" stop-color="#cdbfa4"/>
     </linearGradient>
   </defs>
 
-  <!-- patch cables, arcing out of the top like antennae: data coming in -->
-  <path d="M78 62 C60 30 38 26 26 34" stroke="url(#cableL)" stroke-width="7"
-        fill="none" stroke-linecap="round"/>
-  <circle cx="26" cy="34" r="8" fill="#22d3ee"/>
-  <path d="M162 62 C180 30 202 26 214 34" stroke="url(#cableR)" stroke-width="7"
-        fill="none" stroke-linecap="round"/>
-  <circle cx="214" cy="34" r="8" fill="#f472b6"/>
+  <!-- Walnut end cheeks with the panel spanning between them, which is the
+       actual Moog arrangement — wood on the sides, not a frame around the
+       edge. It also gives the mark two strong verticals, so the silhouette
+       still reads when it is 40 pixels wide. -->
+  <rect x="8"   y="26" width="30" height="188" rx="7" fill="url(#walnut)" stroke="#2b1a0c" stroke-width="2"/>
+  <rect x="202" y="26" width="30" height="188" rx="7" fill="url(#walnut)" stroke="#2b1a0c" stroke-width="2"/>
+  <rect x="34"  y="26" width="172" height="188" rx="3" fill="url(#face)" stroke="#0b0d11" stroke-width="2"/>
+  <!-- brushed highlight along the top of the panel -->
+  <rect x="36" y="28" width="168" height="2" fill="#3a4150" opacity="0.7"/>
 
-  <!-- the module -->
-  <rect x="30" y="56" width="180" height="158" rx="26" fill="url(#panel)"
-        stroke="#33415c" stroke-width="3"/>
-  <!-- rack screws, because it is a real module -->
-  <circle cx="46" cy="72" r="3.5" fill="#3d4c6b"/>
-  <circle cx="194" cy="72" r="3.5" fill="#3d4c6b"/>
-  <circle cx="46" cy="198" r="3.5" fill="#3d4c6b"/>
-  <circle cx="194" cy="198" r="3.5" fill="#3d4c6b"/>
-
-  <!-- knobs, which are also eyes. The indicators point slightly inward, which
-       is the whole difference between a control panel and a face. -->
-  <g>
-    <circle cx="90" cy="112" r="25" fill="url(#knob)" stroke="#94a3b8" stroke-width="2"/>
-    <circle cx="90" cy="112" r="15" fill="#0f1729"/>
-    <circle cx="95" cy="107" r="4.5" fill="#e2e8f0"/>
-    <path d="M90 92 L90 84" stroke="#4ade80" stroke-width="4" stroke-linecap="round"/>
-  </g>
-  <g>
-    <circle cx="150" cy="112" r="25" fill="url(#knob)" stroke="#94a3b8" stroke-width="2"/>
-    <circle cx="150" cy="112" r="15" fill="#0f1729"/>
-    <circle cx="155" cy="107" r="4.5" fill="#e2e8f0"/>
-    <path d="M150 92 L150 84" stroke="#4ade80" stroke-width="4" stroke-linecap="round"/>
+  <!-- oscilloscope -->
+  <rect x="48" y="42" width="144" height="86" rx="6" fill="url(#crt)" stroke="#0a0c0f" stroke-width="2"/>
+  <!-- graticule -->
+  <g stroke="#12351f" stroke-width="1">
+    <line x1="84"  y1="46" x2="84"  y2="124"/>
+    <line x1="120" y1="46" x2="120" y2="124"/>
+    <line x1="156" y1="46" x2="156" y2="124"/>
+    <line x1="52"  y1="64" x2="188" y2="64"/>
+    <line x1="52"  y1="85" x2="188" y2="85"/>
+    <line x1="52"  y1="106" x2="188" y2="106"/>
   </g>
 
-  <!-- the scope: a smile drawn as a waveform, because that is what it is -->
-  <rect x="66" y="152" width="108" height="42" rx="12" fill="#0b1220" stroke="#33415c" stroke-width="2.5"/>
-  <path d="M80 166 C90 188 104 192 120 184 C136 176 150 180 160 166"
-        stroke="#4ade80" stroke-width="5" fill="none"
+  <!-- the trace: a textbook ADSR. Attack to peak, decay to the sustain
+       plateau, hold, then release to zero. Drawn twice — a soft wide pass
+       underneath for phosphor bloom, a crisp one on top — rather than with a
+       blur filter, so it survives renderers that drop filters. -->
+  <path d="M56 117 L84 53 L106 88 L148 88 L184 117"
+        fill="none" stroke="#4ade80" stroke-opacity="0.22" stroke-width="9"
         stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M56 117 L84 53 L106 88 L148 88 L184 117"
+        fill="none" stroke="#5df58c" stroke-width="3.2"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="84" cy="53" r="3.4" fill="#eafff1"/>
 
-  <!-- patch jacks along the bottom edge: audio out -->
-  <circle cx="86" cy="207" r="4" fill="#0b1220" stroke="#475569" stroke-width="2"/>
-  <circle cx="120" cy="207" r="4" fill="#0b1220" stroke="#475569" stroke-width="2"/>
-  <circle cx="154" cy="207" r="4" fill="#0b1220" stroke="#475569" stroke-width="2"/>
+  <!-- ADSR sliders, capped at the envelope's own levels -->
+  <g stroke="#0d0f13" stroke-width="5" stroke-linecap="round">
+    <line x1="72"  y1="148" x2="72"  y2="190"/>
+    <line x1="104" y1="148" x2="104" y2="190"/>
+    <line x1="136" y1="148" x2="136" y2="190"/>
+    <line x1="168" y1="148" x2="168" y2="190"/>
+  </g>
+  <g fill="url(#cap)" stroke="#8d7f66" stroke-width="1">
+    <rect x="62"  y="149" width="20" height="9" rx="3"/>
+    <rect x="94"  y="168" width="20" height="9" rx="3"/>
+    <rect x="126" y="162" width="20" height="9" rx="3"/>
+    <rect x="158" y="180" width="20" height="9" rx="3"/>
+  </g>
+  <g fill="#c9bda6" font-size="13" font-weight="700" letter-spacing="0.5"
+     font-family="ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">
+    <text x="72"  y="202">A</text>
+    <text x="104" y="202">D</text>
+    <text x="136" y="202">S</text>
+    <text x="168" y="202">R</text>
+  </g>
+
+  <!-- power lamp -->
+  <circle cx="194" cy="38" r="3.6" fill="#f59e0b"/>
+  <circle cx="194" cy="38" r="6.5" fill="#f59e0b" fill-opacity="0.22"/>
 </svg>
