@@ -213,15 +213,21 @@ class Interpreter:
         self.api_key = os.environ.get("OPENROUTER_API_KEY", "")
         self._cache: dict[str, Intent] = {}
 
+        # In auto mode, keep the runners-up. A stale OPENROUTER_API_KEY still
+        # looks like a configured backend, and without this it shadows a
+        # perfectly good local model: the key fails, we fall to keyword rules,
+        # and the working Ollama on the same machine is never tried.
+        self._chain: list[str] = []
         if backend == "auto":
             if self.api_key:
-                backend = "openrouter"
-            elif self._ollama_alive():
-                backend = "ollama"
-            else:
-                backend = "heuristic"
+                self._chain.append("openrouter")
+            if self._ollama_alive():
+                self._chain.append("ollama")
+            self._chain.append("heuristic")
+            backend = self._chain[0]
 
         self.backend = backend
+        self._fails = 0
         self.model = (
             model
             or os.environ.get("AGENTISIZER_MODEL")
@@ -348,6 +354,22 @@ class Interpreter:
         )
         return _extract_json(data["message"]["content"])
 
+    def demote(self) -> bool:
+        """
+        Give up on the current backend and try the next candidate.
+
+        Only meaningful in auto mode, where the chain was built at startup.
+        Returns True if there was somewhere to go.
+        """
+        if len(self._chain) <= 1:
+            return False
+        self._chain.pop(0)
+        self.backend = self._chain[0]
+        self._fails = 0
+        self.model = (self._first_ollama_model() or "llama3.2:3b"
+                      if self.backend == "ollama" else self.model)
+        return True
+
     def classify_with_model(self, text: str) -> Intent | None:
         """One model call. None on any failure — never raises."""
         if self.backend not in ("openrouter", "ollama"):
@@ -356,7 +378,13 @@ class Interpreter:
             raw = (self._call_openrouter(text) if self.backend == "openrouter"
                    else self._call_ollama(text))
         except Exception:
-            return None            # network, timeout, malformed
+            # Two strikes, then move down the chain. One failure is a blip;
+            # a pattern means this backend is not coming back this session.
+            self._fails += 1
+            if self._fails >= 2:
+                self.demote()
+            return None
+        self._fails = 0
         if not raw or raw.get("kind") not in KINDS:
             return None
         return Intent(

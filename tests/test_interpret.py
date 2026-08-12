@@ -83,5 +83,51 @@ class TestHeuristic(unittest.TestCase):
                           ("progress", "good", "bad", "blocked", "resolved"))
 
 
+
+
+class TestBackendChain(unittest.TestCase):
+    """
+    A stale API key must not shadow a working local model.
+
+    This was real: an expired OPENROUTER_API_KEY made auto pick OpenRouter,
+    fail, and fall back to keyword rules — while a perfectly good Ollama sat
+    unused on the same machine.
+    """
+
+    def _auto(self, has_key: bool, has_ollama: bool):
+        import os
+        from unittest import mock
+        from agentisizer.interpret import Interpreter
+        env = {"OPENROUTER_API_KEY": "sk-test" if has_key else ""}
+        with mock.patch.dict(os.environ, env, clear=False), \
+             mock.patch.object(Interpreter, "_ollama_alive", lambda self: has_ollama), \
+             mock.patch.object(Interpreter, "_first_ollama_model", lambda self: "llama3.2:3b"):
+            return Interpreter(backend="auto")
+
+    def test_chain_prefers_openrouter_then_ollama_then_rules(self):
+        i = self._auto(has_key=True, has_ollama=True)
+        self.assertEqual(i.backend, "openrouter")
+        self.assertEqual(i._chain, ["openrouter", "ollama", "heuristic"])
+
+    def test_dead_key_demotes_to_the_local_model(self):
+        i = self._auto(has_key=True, has_ollama=True)
+        self.assertTrue(i.demote())
+        self.assertEqual(i.backend, "ollama")
+
+    def test_demotion_bottoms_out_at_the_rules(self):
+        i = self._auto(has_key=True, has_ollama=True)
+        i.demote(); i.demote()
+        self.assertEqual(i.backend, "heuristic")
+        self.assertFalse(i.demote(), "nowhere left to go")
+
+    def test_no_ollama_means_key_then_rules(self):
+        i = self._auto(has_key=True, has_ollama=False)
+        self.assertEqual(i._chain, ["openrouter", "heuristic"])
+
+    def test_nothing_configured_is_just_rules(self):
+        i = self._auto(has_key=False, has_ollama=False)
+        self.assertEqual(i.backend, "heuristic")
+        self.assertFalse(i.demote())
+
 if __name__ == "__main__":
     unittest.main()

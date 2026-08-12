@@ -160,6 +160,11 @@ def cmd_demo(args) -> int:
     conductor = Conductor(sonic, tuning=demo_tuning)
     interp = Interpreter(backend=args.backend, model=args.model)
     healthy, detail, secs = interp.health()
+    # Walk the fallback chain so a dead API key doesn't hide a working local
+    # model — report what will actually be used, not the first thing tried.
+    while not healthy and interp.backend != "heuristic" and interp.demote():
+        out(f"  [dim]{detail.splitlines()[0][:70]} — trying {interp.backend}[/]")
+        healthy, detail, secs = interp.health()
     brain = f"{detail} {secs:.2f}s" if healthy else f"heuristic ({detail})"
     out(f"[bold cyan]The Agentisizer[/] — demo  [dim]({brain})[/]")
     out("[dim]blocker ramp compressed to 22s so the alarm is audible; "
@@ -215,6 +220,11 @@ def cmd_doctor(args) -> int:
     out("\n[bold]Interpreter[/]")
     interp = Interpreter(backend=args.backend, model=args.model)
     healthy, detail, secs = interp.health()
+    # Walk the fallback chain so a dead API key doesn't hide a working local
+    # model — report what will actually be used, not the first thing tried.
+    while not healthy and interp.backend != "heuristic" and interp.demote():
+        out(f"  [dim]{detail.splitlines()[0][:70]} — trying {interp.backend}[/]")
+        healthy, detail, secs = interp.health()
     if healthy and secs > interp.timeout:
         # Slower than we will wait for. These calls time out and the rules
         # answer instead, so the model is contributing nothing.
