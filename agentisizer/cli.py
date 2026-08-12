@@ -24,7 +24,7 @@ from pathlib import Path
 from .conductor import Tuning
 from .daemon import Agentisizer
 from .events import Event
-from .interpret import Interpreter, heuristic
+from .interpret import Interpreter
 from .sonicpi import SonicPi, discover
 from .sources.filedrop import DEFAULT_DIR, ensure_dir
 
@@ -36,7 +36,6 @@ CMD = os.environ.get("AGENTISIZER_CMD", "agentisizer")
 
 try:
     from rich.console import Console
-    from rich.table import Table
     console = Console()
 except ImportError:                       # rich is nice, not required
     console = None

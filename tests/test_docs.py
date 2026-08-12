@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from tools.check_docs import check, real_subcommands
+from tools.check_svg import check as check_svg
 
 
 class TestDocsMatchCode(unittest.TestCase):
@@ -34,6 +35,18 @@ class TestDocsMatchCode(unittest.TestCase):
                    + "|".join(sorted(valid)) + r")\b")
         self.assertRegex("run: agentisizer doctor", pattern)
         self.assertNotRegex("run: ./run-agentisizer.sh doctor", pattern)
+
+
+class TestDiagramsDrawInsideTheirCanvas(unittest.TestCase):
+    """
+    Previewing an SVG is not verifying one. A preview showed a good diagram as
+    clipped and a broken one as fine, in the same sitting; comparing element
+    extents to the viewBox got both right.
+    """
+
+    def test_no_diagram_overflows(self):
+        problems = check_svg()
+        self.assertEqual(problems, [], "\n" + "\n".join(problems))
 
 
 if __name__ == "__main__":

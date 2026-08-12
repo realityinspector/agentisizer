@@ -95,9 +95,11 @@ class SonicPi:
         self._code = udp_client.UDPClient("127.0.0.1", info.server_port)
         self._cues = udp_client.UDPClient("127.0.0.1", info.osc_cues_port)
 
-        # macOS ships a 9216-byte UDP send buffer, which the engine can
-        # approach. Ask for more; if the OS declines we are still fine,
-        # because the engine is stripped before it goes out.
+        # macOS ships a 9216-byte UDP send buffer and the engine outgrew it
+        # once already. With this bump the ceiling is the UDP datagram itself:
+        # measured, 60 KB goes through and 64 KB raises OSError. Failure is
+        # loud either way — sendto raises rather than dropping — and
+        # tests/test_engine.py fails long before we get near it.
         try:
             import socket
             self._code._sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 65536)
@@ -144,7 +146,8 @@ class SonicPi:
         payload = len(code.encode())
         if payload > 60000:
             raise RuntimeError(
-                f"engine is {payload} bytes; too large for a single OSC datagram")
+                f"engine is {payload} bytes and /run-code is one UDP datagram "
+                f"(~64 KB ceiling). Split it, or move logic into Python.")
         self.run_code(code)
 
     def stop(self) -> None:

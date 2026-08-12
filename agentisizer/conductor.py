@@ -34,7 +34,7 @@ from collections import deque
 from dataclasses import dataclass, field
 
 from .events import Event
-from .musical import Harmony, harmony_for
+from .musical import harmony_for
 
 
 # ── tuning. These are musical decisions, so they live together, named. ───
