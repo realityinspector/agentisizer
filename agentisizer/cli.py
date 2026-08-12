@@ -56,7 +56,10 @@ def cmd_start(args) -> int:
     def show(event: Event):
         style = KIND_STYLE.get(event.kind or "progress", "")
         key = holder["app"].conductor.snapshot()["key"] if "app" in holder else ""
-        out(f"{style}{(event.kind or '?'):<9}[/] {event.text[:62]} [cyan]{key}[/]")
+        # `·` decided by the keyword rules, `~` needed the model. Shows the
+        # hybrid working, and how rarely the model is actually consulted.
+        mark = "·" if event.meta.get("via") == "heuristic" else "~"
+        out(f"{style}{(event.kind or '?'):<9}[/] {mark} {event.text[:58]} [cyan]{key}[/]")
 
     try:
         app = Agentisizer(
@@ -243,6 +246,17 @@ def cmd_doctor(args) -> int:
     return 0 if ok else 1
 
 
+def cmd_bench(args) -> int:
+    """Is the model actually earning its latency? Measure, don't assume."""
+    from pathlib import Path as _P
+    sys.path.insert(0, str(_P(__file__).resolve().parent.parent))
+    from tools.bench_interpreter import main as bench_main
+    argv = ["--backend", args.backend]
+    if args.model:
+        argv += ["--model", args.model]
+    return bench_main(argv) if bench_main.__code__.co_argcount else bench_main()
+
+
 # ── setup ────────────────────────────────────────────────────────────────
 def cmd_setup(args) -> int:
     import shutil
@@ -306,6 +320,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--record", metavar="FILE", help="save the demo to a WAV")
 
     sub.add_parser("doctor", help="check the setup")
+    sub.add_parser("bench", help="measure the classifier against the keyword rules")
     s = sub.add_parser("setup", help="install and launch Sonic Pi")
     s.add_argument("--yes", action="store_true", help="don't ask before installing")
 
@@ -323,6 +338,7 @@ def main(argv=None) -> int:
         "say": cmd_say,
         "demo": cmd_demo,
         "doctor": cmd_doctor,
+        "bench": cmd_bench,
         "setup": cmd_setup,
     }[args.cmd](args)
 

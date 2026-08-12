@@ -48,7 +48,24 @@ SYSTEM_PROMPT = (
     "resolved (a bad or blocked thing is now fixed).\n"
     "N is 0.0-1.0, how much attention it deserves: routine 0.2, "
     "tests passing 0.6, production outage 1.0.\n"
-    "S is under 8 words."
+    "S is under 8 words.\n"
+    # Small models follow examples far better than definitions. These six were
+    # chosen from measured failures: the first two because describing ordinary
+    # work was being read as success or failure, and the rest because the
+    # progress/good and bad/blocked boundaries are where errors concentrate.
+    "\nExamples:\n"
+    "reading main.py to map the call graph -> "
+    "{\"kind\":\"progress\",\"intensity\":0.2,\"summary\":\"reading code\"}\n"
+    "compiling, this takes a while -> "
+    "{\"kind\":\"progress\",\"intensity\":0.2,\"summary\":\"compiling\"}\n"
+    "all 240 tests passed -> "
+    "{\"kind\":\"good\",\"intensity\":0.6,\"summary\":\"tests passed\"}\n"
+    "TypeError in parse_headers -> "
+    "{\"kind\":\"bad\",\"intensity\":0.6,\"summary\":\"type error\"}\n"
+    "I need the staging password to continue -> "
+    "{\"kind\":\"blocked\",\"intensity\":0.9,\"summary\":\"needs credentials\"}\n"
+    "credentials received, deploy is green again -> "
+    "{\"kind\":\"resolved\",\"intensity\":0.7,\"summary\":\"deploy recovered\"}"
 )
 
 
@@ -57,7 +74,8 @@ class Intent:
     kind: str
     intensity: float
     summary: str
-    via: str          # which brain decided this — shown by `doctor`
+    via: str            # which brain decided this — shown by `doctor`
+    confident: bool = True   # did the decider actually recognise something?
 
     def __post_init__(self):
         if self.kind not in KINDS:
@@ -121,13 +139,21 @@ _DIMINISHERS = re.compile(r"\b(minor|small|nit|trivial|cosmetic|typo|warning)\b"
 
 
 def heuristic(text: str) -> Intent:
-    """Keyword classification. Used when there is no model, or it failed."""
+    """
+    Keyword classification.
+
+    `confident` records whether a rule actually fired. That distinction is
+    load-bearing: measured over twenty real phrasings, every single miss was
+    a fall-through to the default, and every rule that *did* fire was right.
+    So a match is trustworthy and a fall-through means "I have no idea",
+    which is exactly the case worth spending a model call on.
+    """
     low = (text or "").lower()
-    kind, intensity = "progress", 0.25
+    kind, intensity, matched = "progress", 0.25, False
 
     for pattern, k, base in _RULES:
         if re.search(pattern, low):
-            kind, intensity = k, base
+            kind, intensity, matched = k, base, True
             break
 
     if _INTENSIFIERS.search(low):
@@ -136,7 +162,7 @@ def heuristic(text: str) -> Intent:
         intensity = max(0.05, intensity - 0.25)
 
     summary = " ".join(text.split()[:8]) if text else "activity"
-    return Intent(kind, intensity, summary, via="heuristic")
+    return Intent(kind, intensity, summary, via="heuristic", confident=matched)
 
 
 # ── model-backed classification ──────────────────────────────────────────
@@ -309,8 +335,40 @@ class Interpreter:
         )
         return _extract_json(data["message"]["content"])
 
+    def classify_with_model(self, text: str) -> Intent | None:
+        """One model call. None on any failure — never raises."""
+        if self.backend not in ("openrouter", "ollama"):
+            return None
+        try:
+            raw = (self._call_openrouter(text) if self.backend == "openrouter"
+                   else self._call_ollama(text))
+        except Exception:
+            return None            # network, timeout, malformed
+        if not raw or raw.get("kind") not in KINDS:
+            return None
+        return Intent(
+            raw["kind"],
+            float(raw.get("intensity", 0.5)),
+            str(raw.get("summary", ""))[:80],
+            via=self.backend,
+        )
+
     def interpret(self, text: str) -> Intent:
-        """Classify. Never raises, never blocks the music."""
+        """
+        Rules first, model only when the rules have nothing to say.
+
+        Not a fallback chain — an ordering chosen from measurement. The
+        keyword rules are precise but narrow: when one fires it is reliable,
+        and when none fires the answer is a shrug. A small local model is the
+        opposite, good at reading a sentence with no keywords in it and prone
+        to overreading plain ones ("permission denied, cannot continue" came
+        back as `bad` rather than `blocked`).
+
+        Asking each only what it is good at beat either alone, and it means
+        the model is consulted on the minority of messages — so most events
+        are classified in microseconds and the latency budget is spent only
+        where it buys something.
+        """
         if not text or not text.strip():
             return Intent("progress", 0.2, "", via="empty")
 
@@ -318,23 +376,11 @@ class Interpreter:
         if key in self._cache:
             return self._cache[key]
 
-        result: Intent | None = None
-        if self.backend in ("openrouter", "ollama"):
-            try:
-                raw = (self._call_openrouter(text) if self.backend == "openrouter"
-                       else self._call_ollama(text))
-                if raw and raw.get("kind") in KINDS:
-                    result = Intent(
-                        raw["kind"],
-                        float(raw.get("intensity", 0.5)),
-                        str(raw.get("summary", ""))[:80],
-                        via=self.backend,
-                    )
-            except Exception:
-                result = None      # network, timeout, malformed — fall through
-
-        if result is None:
-            result = heuristic(text)
+        result = heuristic(text)
+        if not result.confident:
+            from_model = self.classify_with_model(text)
+            if from_model is not None:
+                result = from_model
 
         if len(self._cache) < 2000:
             self._cache[key] = result

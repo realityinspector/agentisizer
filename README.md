@@ -129,8 +129,8 @@ music. The musical side never learns where an event came from. That is why a
 new source is a small file instead of a rewrite.
 
 - **`agentisizer/events.py`** — the one shape everything collapses into.
-- **`agentisizer/interpret.py`** — natural language → one of five kinds, via
-  OpenRouter, a local Ollama, or keyword rules.
+- **`agentisizer/interpret.py`** — natural language → one of five kinds:
+  keyword rules first, a model only where they shrug.
 - **`agentisizer/conductor.py`** — musical state, decay, spacing, escalation.
   The rules above live here.
 - **`agentisizer/musical.py`** — key and mode selection: the brightness
@@ -199,11 +199,32 @@ Add a hook that posts tool events as they happen:
 }
 ```
 
-## The interpreter
+## The interpreter: rules first, model second
 
-Classification is a language judgement, so a language model makes it —
-OpenRouter if `OPENROUTER_API_KEY` is set, a local Ollama if one is answering,
-otherwise keyword rules.
+Classification is a language judgement, so there is a model involved — but
+which decides *what* was chosen by measurement, not by preference.
+
+Benchmarked on twenty real agent phrasings, ten containing obvious keywords
+and ten deliberately without (`agentisizer bench` runs this):
+
+| | score | cost |
+| --- | --- | --- |
+| keyword rules alone | 14/20 | 0.1 ms |
+| llama3.2:3b alone | 14/20 | 2.07 s |
+| **rules first, model on the rest** | **16/20** | 1.18 s |
+
+The two are wrong about *different* things. Every single rule miss was a
+fall-through — when a rule fires it is reliable; when none fires the answer
+is a shrug. The small model is the opposite: good at reading a sentence with
+no keywords in it, and prone to overreading a plain one ("permission denied,
+cannot continue" came back as `bad` rather than `blocked`).
+
+So the rules go first, and the model is asked only when they have nothing to
+say. That beats either alone, and most events never reach the model at
+all — they are classified in microseconds, and the latency budget is spent
+only where it buys something.
+
+`agentisizer start` marks which decided: `·` rules, `~` model.
 
 **The model classifies. It does not compose.** It returns one of five kinds
 and a number, and cannot reach the synth. Everything musical downstream is
@@ -211,10 +232,15 @@ bounded by the conductor. A bad classification makes the soundtrack briefly
 wrong, never unpleasant — letting a language model drive audio parameters
 directly is how you get something nobody leaves running.
 
-The keyword fallback is not a stub; it is tested like a feature, because with
-no API key it *is* the product. Every case in `tests/test_interpret.py` under
-"cases that were wrong on the first real run" is one it actually got wrong
-against real agent phrasing.
+The rules are not a stub; they are tested like a feature, because with no
+model configured they *are* the product. Every case in
+`tests/test_interpret.py` under "cases that were wrong on the first real run"
+is one they actually got wrong against real agent phrasing.
+
+If you use a local model, keep it small and non-reasoning. A 12B reasoning
+model measured 27–80s per classification — it spends its token budget
+thinking before answering a one-word question, which is the wrong trade
+here. `llama3.2:3b` is the reference.
 
 ```bash
 ./run-agentisizer.sh doctor
@@ -229,21 +255,20 @@ the only place a degraded setup surfaces.
 - **Sonic Pi 4 or 5** — `./run-agentisizer.sh setup` will install and launch it
 - **Python 3.10–3.13** — the wrapper builds its own venv; 3.14 is not usable
   yet on Homebrew (broken `ensurepip`)
-- An LLM is **optional** — and if you use a local one, pick a small
-  non-reasoning model. Reasoning models spend their token budget thinking
-  before answering a one-word question, which is exactly the wrong trade
-  here: `ollama pull llama3.2:3b` rather than a 12B thinker.
+- An LLM is **optional** — the rules run alone perfectly well. If you want one,
+  `ollama pull llama3.2:3b` is the verified setup; check it with
+  `agentisizer bench`.
 
 ## Status
 
 Alpha. The engine, conductor, both input modules, and the CLI work and are
 verified against Sonic Pi 5.0. Rough edges:
 
-- The interpreter's LLM path is written and exercised, but every local model
-  tried so far has been too slow to use: a 12B reasoning model measured
-  27–80s per classification, against a 2.5s budget. `doctor` reports latency
-  and falls back to keyword rules. A small non-reasoning model should be
-  fine; that combination is not yet verified end to end.
+- The model still misses things the rules do too — "that did it" reads as
+  `progress`, not `good`. 16/20 is a floor, not a ceiling; `agentisizer
+  bench` is there to make improvements measurable rather than felt.
+- OpenRouter is implemented but has only been exercised against a dead key.
+  The local path is the verified one.
 - Long-form variation is still thin. Key and mode move with mood, but there
   is one progression shape per brightness region and no section structure
   above the 16-bar phrase.
