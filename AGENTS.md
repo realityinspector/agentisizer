@@ -244,8 +244,11 @@ soundtrack follow the graph rather than your commentary on it:
 ./run-agentisizer.sh start --graph http://localhost:4600/status
 ```
 
-Answer with `{"working": N, "blocked": N, "failed": N, "idle": N, "agents":
-{name: status}}`. Status transitions become events with the right semantics,
+Answer with `{"working": N, "blocked": N, "failed": N, "idle": N,
+"completed": N, "agents": {name: status}}`. Use `completed` only for finished
+*on purpose* — a node that quietly stops should stay `idle`, because that is
+what lets the soundtrack say "done" without ever claiming success for
+something that merely died. Status transitions become events with the right semantics,
 and the working level is taken as authoritative instead of inferred from how
 often you talk. You then need send far fewer events by hand — only the things
 the graph cannot express, like *why* something is blocked.

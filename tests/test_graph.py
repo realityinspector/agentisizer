@@ -115,6 +115,73 @@ class TestTransitions(unittest.TestCase):
         self.assertEqual(g.diff({"a": "quiescent"}), [])
 
 
+class TestCompletion(unittest.TestCase):
+    """
+    `completed` means finished on purpose. A node that quietly stops stays
+    `idle`, which is what keeps working→idle honestly silent.
+    """
+
+    def test_finishing_is_good_news(self):
+        g, _ = source()
+        g.diff({"a": "working"})
+        events = g.diff({"a": "completed"})
+        self.assertEqual([e.kind for e in events], ["good"])
+        self.assertIn("finished", events[0].text)
+
+    def test_finishing_from_idle_also_counts(self):
+        g, _ = source()
+        g.diff({"a": "idle"})
+        self.assertEqual([e.kind for e in g.diff({"a": "completed"})], ["good"])
+
+    def test_finishing_out_of_a_block_resolves_rather_than_celebrates(self):
+        """
+        The trap: blocked → completed is both a finish and a recovery, and
+        only `resolved` stands the alarm down. Emitting `good` here would
+        leave an alarm ringing over work that is already done.
+        """
+        g, _ = source()
+        g.diff({"a": "blocked"})
+        events = g.diff({"a": "completed"})
+        self.assertEqual([e.kind for e in events], ["resolved"],
+                         "must clear the alarm, not just cheer")
+
+    def test_and_that_actually_silences_the_conductor(self):
+        """Same case, end to end, because the point is the alarm stopping."""
+        from agentisizer.events import Event
+        c = Conductor(FakeSonic(), Tuning(blocker_ramp_seconds=0.2,
+                                          blocker_decay_seconds=0.05))
+        g, got = source()
+        g.diff({"a": "blocked"})
+        for e in g.diff({"a": "blocked"}) or []:
+            c.submit(e)
+        c.submit(Event(text="a is blocked", kind="blocked", intensity=0.9))
+        import time; time.sleep(0.3); c._tick()
+        self.assertGreater(c.blocker, 0.5, "alarm should be up")
+        for e in g.diff({"a": "completed"}):
+            c.submit(e)
+        time.sleep(0.2); c._tick()
+        self.assertLess(c.blocker, 0.3, "finishing a blocked task must quiet the alarm")
+
+    def test_restarting_after_completion_is_progress(self):
+        g, _ = source()
+        g.diff({"a": "completed"})
+        self.assertEqual([e.kind for e in g.diff({"a": "working"})], ["progress"])
+
+    def test_completed_nodes_still_count_as_fleet_for_the_level(self):
+        """
+        A fleet of eight with five finished is not a fleet of three: the
+        working fraction has to be measured against everything.
+        """
+        from agentisizer.sources.graph import ALL_STATES
+        self.assertIn("completed", ALL_STATES)
+        g, _ = source()
+        g.conductor = type("C", (), {"observe_activity": lambda self, v: setattr(self, "v", v)})()
+        g.fetch = lambda: {"working": 1, "blocked": 0, "failed": 0,
+                           "idle": 2, "completed": 5, "agents": {}}
+        g.poll_once()
+        self.assertAlmostEqual(g.conductor.v, activity_from(1, 8), places=3)
+
+
 class TestObservedActivity(unittest.TestCase):
     """An authoritative reading beats inference, but must not outlive its source."""
 

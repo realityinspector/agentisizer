@@ -285,7 +285,7 @@ wrong more slowly.
 The endpoint should answer with counts by status:
 
 ```json
-{"working": 1, "blocked": 0, "failed": 0, "idle": 7,
+{"working": 1, "blocked": 0, "failed": 0, "idle": 7, "completed": 0,
  "agents": {"atlas": "working", "baton-agent": "idle"}}
 ```
 
@@ -295,12 +295,18 @@ inherits the same spacing and escalation rules as a chat. And **levels are
 reported directly**, handed to the conductor as an authoritative reading
 rather than inferred.
 
+`completed` is what lets the soundtrack say "done": it means finished on
+purpose, where a node that quietly stops stays `idle`. Note that
+`blocked → completed` emits `resolved` rather than good news — it is both a
+finish and a recovery, and only `resolved` stands the alarm down. Getting that
+order wrong leaves a siren running over work that is already finished.
+
 Two deliberate silences. The first poll announces nothing except agents
 already blocked or failed, so nine idle nodes don't open with nine events —
 but arriving late is no reason to stay quiet about a blocker. And
-`working → idle` says nothing at all: finished and died look identical from
-outside, and claiming success for a node that quietly stopped is worse than
-saying nothing.
+`working → idle` says nothing at all: without a `completed` status, finished
+and died look identical from outside, and claiming success for a node that
+quietly stopped is worse than saying nothing.
 
 Going the other way, `GET /state` is what a map can render back:
 

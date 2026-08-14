@@ -6,9 +6,12 @@ the ecosystem at localhost:4600), but the shape is general — any coordinator
 that can answer with counts by status will work.
 
     GET <url>
-    {"working": 1, "blocked": 0, "failed": 0, "idle": 7,
+    {"working": 1, "blocked": 0, "failed": 0, "idle": 7, "completed": 0,
      "blocked_for": 0.0,
      "agents": {"atlas": "working", "baton-agent": "idle", ...}}
+
+`completed` means finished on purpose. A node that quietly stops stays `idle`,
+which is why `working → idle` is silent — see below.
 
 ── why this source is different ─────────────────────────────────────────
 Every other input is an event stream, so the conductor has to *infer* how
@@ -19,9 +22,10 @@ holds the number the conductor has been estimating.
 So this source does two things rather than one:
 
   * **Transitions become events.** An agent entering `blocked` emits a
-    blocked event; leaving it emits `resolved`. These go through the normal
-    path, so they inherit the accent spacing and the alarm escalation — the
-    listenability rules apply to a map exactly as they do to a chat.
+    blocked event; leaving it emits `resolved`; reaching `completed` emits
+    good news. These go through the normal path, so they inherit the accent
+    spacing and the alarm escalation — the listenability rules apply to a map
+    exactly as they do to a chat.
   * **Levels are reported directly.** The working fraction is handed to the
     conductor as an authoritative reading rather than inferred from event
     rate, because inferring a number somebody already knows is just a way of
@@ -49,6 +53,10 @@ DEFAULT_URL = "http://127.0.0.1:4600/status"
 ACTIVE = "working"
 STOPPED = "blocked"
 BROKEN = "failed"
+DONE = "completed"        # finished on purpose, as opposed to quietly stopping
+
+# Everything that counts as a node in the fleet, for the activity fraction.
+ALL_STATES = (ACTIVE, STOPPED, BROKEN, DONE, "idle")
 
 
 def activity_from(working: int, total: int) -> float:
@@ -127,9 +135,18 @@ class GraphSource:
                     source="graph", kind="bad", intensity=0.8,
                     meta={"agent": name, "from": before}))
             elif before in (STOPPED, BROKEN):
+                # Checked before `completed` on purpose. Going blocked →
+                # completed is both a finish and a recovery, and only
+                # `resolved` stands the alarm down — emitting `good` here
+                # would leave it ringing over work that is already done.
                 events.append(Event(
                     text=f"{name} recovered and is {status} again",
                     source="graph", kind="resolved", intensity=0.7,
+                    meta={"agent": name, "from": before}))
+            elif status == DONE:
+                events.append(Event(
+                    text=f"{name} finished",
+                    source="graph", kind="good", intensity=0.6,
                     meta={"agent": name, "from": before}))
             elif status == ACTIVE:
                 events.append(Event(
@@ -159,8 +176,7 @@ class GraphSource:
 
         if self.conductor is not None:
             working = int(data.get(ACTIVE, 0) or 0)
-            total = sum(int(data.get(k, 0) or 0)
-                        for k in (ACTIVE, STOPPED, BROKEN, "idle"))
+            total = sum(int(data.get(k, 0) or 0) for k in ALL_STATES)
             self.conductor.observe_activity(activity_from(working, total))
 
         return len(agents)
