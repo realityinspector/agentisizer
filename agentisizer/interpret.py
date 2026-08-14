@@ -132,6 +132,16 @@ _RULES: list[tuple[str, str, float]] = [
      r"|landed|approved|work(s|ed|ing))\b", "good", 0.6),
 ]
 
+# Reports about blockers are not reports of being blocked. Real traffic:
+# "deploy pending CI; nothing blocked; spend ~$3.55/$5" raised the alarm,
+# because the rules saw the word and not the negation in front of it. These
+# phrases are cut before matching, so what remains has to stand on its own —
+# "not blocked by the API but stuck on auth" still fires, on "stuck".
+_NEGATED = re.compile(
+    r"\b(nothing|not|no|never|isn'?t|aren'?t|wasn'?t|weren'?t|weren't|"
+    r"without any)\s+(\w+\s+){0,2}"
+    r"(blocked|blockers?|stuck|waiting|failing|failures?|errors?)\b", re.I)
+
 _INTENSIFIERS = re.compile(
     r"\b(critical|fatal|urgent|severe|production|outage|data ?loss|"
      r"security|breach|emergency|corrupt)\b", re.I)
@@ -149,6 +159,7 @@ def heuristic(text: str) -> Intent:
     which is exactly the case worth spending a model call on.
     """
     low = (text or "").lower()
+    low = _NEGATED.sub(" ", low)      # "nothing blocked" must not read as blocked
     kind, intensity, matched = "progress", 0.25, False
 
     for pattern, k, base in _RULES:

@@ -129,6 +129,40 @@ class TestBackendChain(unittest.TestCase):
         self.assertEqual(i.backend, "heuristic")
         self.assertFalse(i.demote())
 
+class TestNegation(unittest.TestCase):
+    """
+    Talking about blockers is not being blocked.
+
+    From a real Atlas feed: "deploy pending CI; nothing blocked; spend
+    ~$3.55/$5" raised the alarm, because the rules matched the word and
+    ignored the negation in front of it. A false alarm is expensive here —
+    it escalates for three minutes and teaches the listener to distrust it.
+    """
+
+    def assert_not_blocked(self, text):
+        self.assertNotEqual(heuristic(text).kind, "blocked", f"false alarm on: {text!r}")
+
+    def test_negated_blockers_do_not_raise_the_alarm(self):
+        for t in ["deploy pending CI; nothing blocked; spend ~$3.55/$5",
+                  "no blockers this round",
+                  "not blocked, just slow",
+                  "isn't blocked on anything",
+                  "no errors in the run",
+                  "never stuck for long"]:
+            self.assert_not_blocked(t)
+
+    def test_a_real_block_still_fires_next_to_a_negation(self):
+        """Cutting the negated phrase must not deafen us to the rest."""
+        self.assertEqual(heuristic("not blocked by the API but stuck on auth").kind,
+                         "blocked")
+
+    def test_plain_blocks_are_untouched(self):
+        for t in ["blocked on the missing credential",
+                  "permission denied, cannot continue",
+                  "I need the staging database password to continue"]:
+            self.assertEqual(heuristic(t).kind, "blocked", t)
+
+
 class TestStartupProbe(unittest.TestCase):
     """
     select_backend settles the chain before any event arrives.
