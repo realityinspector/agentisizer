@@ -23,6 +23,7 @@ from .events import Event
 from .interpret import Interpreter
 from .sonicpi import SonicPi
 from .sources.filedrop import FileDropSource
+from .sources.graph import GraphSource
 from .sources.http_api import HttpSource
 
 
@@ -33,6 +34,7 @@ class Agentisizer:
         model: str | None = None,
         port: int = 8912,
         drop_dir: Path | None = None,
+        graph_url: str | None = None,
         tuning: Tuning | None = None,
         on_event=None,
     ):
@@ -52,6 +54,12 @@ class Agentisizer:
             FileDropSource(self.ingest, directory=drop_dir),
             HttpSource(self.ingest, port=port, snapshot=self.conductor.snapshot),
         ]
+        if graph_url:
+            # Opt-in: only meaningful if something is publishing an agent
+            # graph. It gets the conductor as well as the emit callback,
+            # because it reports levels as well as events.
+            self.sources.append(
+                GraphSource(self.ingest, conductor=self.conductor, url=graph_url))
 
     def ingest(self, event: Event) -> None:
         """Called by sources, from their own threads. Never blocks them."""

@@ -80,6 +80,11 @@ class Tuning:
     max_activity: float = 1.0
     max_tension: float = 0.9
 
+    # How long an authoritative activity reading stays trusted. A source that
+    # knows the real level (a coordinator's graph) reports it directly, but if
+    # that source dies we must not hold the music at its last reading forever.
+    observed_ttl: float = 15.0
+
 
 def _decay(value: float, halflife: float, dt: float, floor: float = 0.0) -> float:
     if halflife <= 0:
@@ -112,6 +117,8 @@ class Conductor:
         self._thread: threading.Thread | None = None
         self._last_tick = time.time()
         self._started = time.time()
+        self._observed: tuple[float, float] | None = None   # (value, when)
+        self._effective = 0.0     # what actually reached the engine last tick
         self.events_seen = 0
         self.harmony = harmony_for(0.0, 0.0, 0.0)
 
@@ -175,6 +182,25 @@ class Conductor:
         self._last_hit[kind] = now
         return True
 
+    def observe_activity(self, value: float | None) -> None:
+        """
+        Report the real activity level, from a source that actually knows it.
+
+        Event rate is a proxy: the conductor counts how often things happen
+        and calls that busyness. A coordinator holding the agent graph does
+        not need to guess — it knows how many are working. When such a source
+        is present its reading is used as a floor, so events can still push
+        *above* it (a burst of good news is louder than idling) but the music
+        never claims quiet while four agents are visibly running.
+
+        Pass None to stop asserting a level. Readings also expire, so a source
+        that dies mid-run releases the floor instead of pinning it.
+        """
+        with self._lock:
+            self._observed = (
+                (max(0.0, min(1.0, float(value))), time.time())
+                if value is not None else None)
+
     # ── the clock ────────────────────────────────────────────────────────
     def _tick(self) -> None:
         now = time.time()
@@ -193,7 +219,11 @@ class Conductor:
             elif self.blocker > 0:
                 self.blocker = max(0.0, self.blocker - dt / self.t.blocker_decay_seconds)
 
-            a = min(self.t.max_activity, self.activity * self.density_trim) * self.gain_trim
+            inferred = self.activity
+            if self._observed and now - self._observed[1] < self.t.observed_ttl:
+                inferred = max(inferred, self._observed[0])
+            a = min(self.t.max_activity, inferred * self.density_trim) * self.gain_trim
+            self._effective = a
             v, ten, blk = self.valence, self.tension, self.blocker
             self.harmony = harmony_for(v, ten, now - self._started)
             harmony = self.harmony
@@ -203,8 +233,14 @@ class Conductor:
             self.on_change(self.snapshot())
 
     def snapshot(self) -> dict:
+        # `activity` is what actually reached the engine, not the inferred
+        # value — anything visualising this is trying to match what is being
+        # heard, and reporting 0.0 while the music runs at 0.2 would put a map
+        # and its soundtrack out of step. `inferred` and `observed` are kept
+        # alongside so the difference is inspectable rather than hidden.
         return {
-            "activity": round(self.activity, 3),
+            "activity": round(self._effective, 3),
+            "inferred": round(self.activity, 3),
             "valence": round(self.valence, 3),
             "tension": round(self.tension, 3),
             "blocker": round(self.blocker, 3),
@@ -212,6 +248,7 @@ class Conductor:
             "blocked_for": (round(time.time() - self._blocked_since, 1)
                             if self._blocked_since else 0.0),
             "key": self.harmony.name(),
+            "observed": (self._observed[0] if self._observed else None),
         }
 
     def recent_events(self, n: int = 20) -> list[Event]:

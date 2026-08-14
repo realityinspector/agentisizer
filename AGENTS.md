@@ -235,6 +235,21 @@ keeps the density honest:
 Hooks give you the texture for free. Send the *interesting* events yourself,
 in your own words — the hook cannot tell that a test suite went green.
 
+### If you coordinate other agents
+
+If you hold a graph of agents and their statuses, publish it and let the
+soundtrack follow the graph rather than your commentary on it:
+
+```bash
+./run-agentisizer.sh start --graph http://localhost:4600/status
+```
+
+Answer with `{"working": N, "blocked": N, "failed": N, "idle": N, "agents":
+{name: status}}`. Status transitions become events with the right semantics,
+and the working level is taken as authoritative instead of inferred from how
+often you talk. You then need send far fewer events by hand — only the things
+the graph cannot express, like *why* something is blocked.
+
 ### Any other harness
 
 Wrap your command runner:

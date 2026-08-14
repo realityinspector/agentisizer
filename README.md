@@ -139,7 +139,8 @@ new source is a small file instead of a rewrite.
 - **`agentisizer/musical.py`** — key and mode selection: the brightness
   ladder, and the rules about when it is safe to modulate.
 - **`agentisizer/sources/`** — one file per input. `filedrop.py` is ~100 lines
-  and does nothing clever; copy it to add your own.
+  and does nothing clever; copy it to add your own. `graph.py` is the
+  exception worth reading — it reports *state* rather than events.
 - **`engine/engine.rb`** — runs *inside* Sonic Pi, permanently.
 
 ### Why the engine lives in Sonic Pi
@@ -269,6 +270,49 @@ HTTP 401 — {"error":{"message":"User not found."}} — trying ollama
 ✓ ollama:llama3.2:3b (1.93s per call)
 ```
 
+## Driving it from a coordinator's graph
+
+Every other input is an event stream, so the conductor has to *infer* how busy
+things are by counting how often messages arrive. A coordinator that holds a
+graph of agents does not have that problem — it knows four are working and one
+is blocked. Inferring a number somebody already knows is a way of getting it
+wrong more slowly.
+
+```bash
+./run-agentisizer.sh start --graph http://localhost:4600/status
+```
+
+The endpoint should answer with counts by status:
+
+```json
+{"working": 1, "blocked": 0, "failed": 0, "idle": 7,
+ "agents": {"atlas": "working", "baton-agent": "idle"}}
+```
+
+`sources/graph.py` then does two things. **Transitions become events** — an
+agent entering `blocked` raises the alarm, leaving it resolves — so a map
+inherits the same spacing and escalation rules as a chat. And **levels are
+reported directly**, handed to the conductor as an authoritative reading
+rather than inferred.
+
+Two deliberate silences. The first poll announces nothing except agents
+already blocked or failed, so nine idle nodes don't open with nine events —
+but arriving late is no reason to stay quiet about a blocker. And
+`working → idle` says nothing at all: finished and died look identical from
+outside, and claiming success for a node that quietly stopped is worse than
+saying nothing.
+
+Going the other way, `GET /state` is what a map can render back:
+
+```json
+{"activity": 0.2, "inferred": 0.0, "observed": 0.2, "valence": 0.0,
+ "tension": 0.0, "blocker": 0.0, "blocked_for": 0.0, "key": "A dorian"}
+```
+
+`activity` is what actually reached the engine — matching what is being heard,
+which is the point. `inferred` and `observed` sit alongside so the difference
+is inspectable.
+
 ## Commands
 
 Everything runs through the wrapper. There is no bare `agentisizer` on your
@@ -280,7 +324,7 @@ own virtualenv, so there is nothing to activate.
 | `./run-agentisizer.sh setup` | install Sonic Pi if needed, launch it, verify it responds |
 | `./run-agentisizer.sh doctor` | check each layer and say which one is broken |
 | `./run-agentisizer.sh demo` | 90-second tour of every state (`--record FILE` to keep it) |
-| `./run-agentisizer.sh start` | run the soundtrack until you stop it |
+| `./run-agentisizer.sh start` | run the soundtrack until you stop it (`--graph URL` to follow a coordinator) |
 | `./run-agentisizer.sh say "..."` | send one event (`--kind`, `--intensity`, `--source`) |
 | `./run-agentisizer.sh bench` | score the classifier against the keyword rules |
 | `./run-agentisizer.sh test` | run the test suite |

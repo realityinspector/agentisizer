@@ -75,6 +75,7 @@ def cmd_start(args) -> int:
             model=args.model,
             port=args.port,
             drop_dir=Path(args.drop_dir) if args.drop_dir else None,
+            graph_url=args.graph,
             on_event=show,
         )
     except RuntimeError as e:
@@ -351,6 +352,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("start", help="run the soundtrack")
     s.add_argument("--drop-dir", default=None, help="directory to watch for event files")
+    s.add_argument("--graph", default=None, metavar="URL",
+                   help="poll a coordinator's agent-graph status endpoint "
+                        "(e.g. http://localhost:4600/status)")
 
     s = sub.add_parser("say", help="send one event")
     s.add_argument("text", nargs="+")
