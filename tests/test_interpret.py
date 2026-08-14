@@ -211,6 +211,35 @@ class TestStartupProbe(unittest.TestCase):
         i.select_backend()
         self.assertEqual(i._fails, 0)
 
+    def test_a_slow_but_working_backend_is_not_demoted(self):
+        """
+        The regression: the first version of the probe used the ordinary event
+        timeout, so a cold Ollama — which needs a few seconds to load from
+        disk before it can answer at all — timed out and was demoted for the
+        whole life of the process. That is the exact failure the probe exists
+        to prevent, reintroduced one layer up.
+
+        A backend slow to wake but working must survive. The probe therefore
+        goes through health(), which warms first and allows a generous window;
+        probing with the event budget is what broke it.
+        """
+        import time
+        i = self._interp(openrouter_ok=False, ollama_ok=True)
+        i.timeout = 0.2                      # a tight event budget
+        good = {"kind": "good", "intensity": 0.6, "summary": "ok"}
+        calls = []
+
+        def cold_then_warm(_text):
+            calls.append(1)
+            if len(calls) == 1:
+                time.sleep(0.5)              # cold load, well past the budget
+            return good
+
+        i._call_ollama = cold_then_warm
+        self.assertEqual(i.select_backend(), "ollama",
+                         "a cold model must not be mistaken for a dead one")
+        self.assertGreaterEqual(len(calls), 2, "should warm before judging")
+
     def test_probing_is_idempotent(self):
         i = self._interp(openrouter_ok=False, ollama_ok=True)
         self.assertEqual(i.select_backend(), i.select_backend())

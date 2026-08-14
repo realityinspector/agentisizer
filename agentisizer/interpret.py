@@ -414,23 +414,22 @@ class Interpreter:
         announces "interpreter: openrouter:…", which is a lie the moment the
         key is stale; and the first two model-eligible events are spent
         failing before it demotes. Worse, the *third* then pays a full timeout
-        waking a cold Ollama, because demotion happens under a live event
-        rather than before any arrive. Measured on a real start: 401, 401,
-        then a 6.00s timeout, and only the fourth event actually classified.
+        waking a cold Ollama. Measured on a real start: 401, 401, then a 6.00s
+        timeout, and only the fourth event actually classified.
 
-        One probe per candidate at startup turns all of that into one honest
-        line and a warm model.
+        This delegates to health() rather than calling the backends directly,
+        and that is the whole point. The first version probed with the normal
+        6s event timeout and so timed out on a cold model — demoting the only
+        working backend for the entire life of the process, which is the exact
+        failure it was written to prevent, reintroduced one layer up. health()
+        already warms the model and allows it a generous window, because a
+        one-time startup cost buys a warm model for the whole session.
         """
         while self.backend in ("openrouter", "ollama"):
-            try:
-                raw = (self._call_openrouter("all tests passed")
-                       if self.backend == "openrouter"
-                       else self._call_ollama("all tests passed"))
-                if raw and raw.get("kind") in KINDS:
-                    self._fails = 0
-                    return self.backend
-            except Exception:
-                pass
+            healthy, _, _ = self.health()
+            if healthy:
+                self._fails = 0
+                return self.backend
             if not self.demote():
                 break
         return self.backend
