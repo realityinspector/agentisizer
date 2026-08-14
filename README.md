@@ -321,6 +321,26 @@ is inspectable.
 
 ## Commands
 
+Run it with no arguments for a menu that shows what's happening and what you
+can do about it:
+
+```bash
+./run-agentisizer.sh
+```
+
+```
+╭──────────────── The Agentisizer ────────────────╮
+│ ● playing  C aeolian   activity 0.40  …         │
+│ 15 events · pid 46947                           │
+╰─────────────────────────────────────────────────╯
+  1   Stop the soundtrack
+  2   Restart it
+  3   Say something to it
+  …
+```
+
+Subcommands still work unchanged, which is what scripts and coordinators use.
+
 Everything runs through the wrapper. There is no bare `agentisizer` on your
 PATH unless you `pip install .` deliberately — the wrapper builds and uses its
 own virtualenv, so there is nothing to activate.
@@ -330,7 +350,11 @@ own virtualenv, so there is nothing to activate.
 | `./run-agentisizer.sh setup` | install Sonic Pi if needed, launch it, verify it responds |
 | `./run-agentisizer.sh doctor` | check each layer and say which one is broken |
 | `./run-agentisizer.sh demo` | 90-second tour of every state (`--record FILE` to keep it) |
+| `./run-agentisizer.sh` | the menu — status, and everything below |
 | `./run-agentisizer.sh start` | run the soundtrack until you stop it (`--graph URL` to follow a coordinator) |
+| `./run-agentisizer.sh stop` | stop it from anywhere, including another terminal |
+| `./run-agentisizer.sh restart` | stop, then start again |
+| `./run-agentisizer.sh status` | is it running, and what is it doing |
 | `./run-agentisizer.sh say "..."` | send one event (`--kind`, `--intensity`, `--source`) |
 | `./run-agentisizer.sh bench` | score the classifier against the keyword rules |
 | `./run-agentisizer.sh test` | run the test suite |

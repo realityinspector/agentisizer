@@ -21,6 +21,7 @@ import time
 import urllib.request
 from pathlib import Path
 
+from . import process
 from .conductor import Tuning
 from .daemon import Agentisizer
 from .events import Event
@@ -69,6 +70,18 @@ def cmd_start(args) -> int:
         mark = "·" if event.meta.get("via") == "heuristic" else "~"
         out(f"{style}{(event.kind or '?'):<9}[/] {mark} {event.text[:58]} [cyan]{key}[/]")
 
+    st = process.status(args.port)
+    if st["running"]:
+        if st["ours"] and st["state"]:
+            out(f"[yellow]![/] already running [dim](pid {st['pid']})[/] — "
+                f"{st['state']['key']}, activity {st['state']['activity']:.2f}")
+            out(f"  [bold]{CMD} stop[/] to stop it, or [bold]{CMD} restart[/]")
+        else:
+            out(f"[red]✗[/] port {args.port} is in use by something that isn't us")
+            out(f"  [dim]check: lsof -nP -iTCP:{args.port} -sTCP:LISTEN[/]")
+            out(f"  [dim]or pick another: {CMD} --port 8913 start[/]")
+        return 1
+
     try:
         app = Agentisizer(
             backend=args.backend,
@@ -85,6 +98,7 @@ def cmd_start(args) -> int:
 
     holder["app"] = app
     out("[bold cyan]The Agentisizer[/] — listening")
+    process.write_pidfile()   # so another window can stop this
     app.start()          # settles the backend before we claim which one it is
     for line in app.describe():
         out(f"  [dim]·[/] {line}")
@@ -96,6 +110,8 @@ def cmd_start(args) -> int:
     except KeyboardInterrupt:
         out("\n[dim]stopping…[/]")
         app.stop()
+    finally:
+        process.clear_pidfile()
     return 0
 
 
@@ -272,6 +288,41 @@ def cmd_doctor(args) -> int:
     return 0 if ok else 1
 
 
+def cmd_restart(args) -> int:
+    ok, msg = process.stop(args.port)
+    out(("[green]✓[/] " if ok else "[dim]·[/] ") + msg)
+    time.sleep(1.0)          # let the port come back
+    return cmd_start(args)
+
+
+def cmd_stop(args) -> int:
+    ok, msg = process.stop(args.port)
+    out(("[green]✓[/] " if ok else "[yellow]![/] ") + msg)
+    return 0
+
+
+def cmd_status(args) -> int:
+    st = process.status(args.port)
+    if st["ours"] and st["state"]:
+        s = st["state"]
+        out(f"[green]● running[/] [dim](pid {st['pid']})[/]  {s['key']}")
+        out(f"  activity {s['activity']:.2f}   valence {s['valence']:+.2f}   "
+            f"tension {s['tension']:.2f}   blocker {s['blocker']:.2f}")
+        out(f"  [dim]{s['events']} events"
+            + (f" · blocked for {s['blocked_for']:.0f}s" if s.get("blocked_for") else "")
+            + "[/]")
+    elif st["running"]:
+        out(f"[yellow]●[/] port {args.port} busy, but not answering as us")
+    else:
+        out("[dim]○ not running[/]")
+    return 0
+
+
+def cmd_menu(args) -> int:
+    from .menu import main as menu_main
+    return menu_main(args.port)
+
+
 def cmd_test(args) -> int:
     """Run the suite. Documented in AGENTS.md, so it has to exist here."""
     import subprocess
@@ -367,6 +418,13 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("doctor", help="check the setup")
     sub.add_parser("bench", help="measure the classifier against the keyword rules")
     sub.add_parser("test", help="run the test suite")
+    sub.add_parser("stop", help="stop a running soundtrack, from anywhere")
+    sub.add_parser("status", help="is it running, and what is it doing")
+    sub.add_parser("menu", help="interactive menu")
+
+    p_restart = sub.add_parser("restart", help="stop it, then start it again")
+    p_restart.add_argument("--graph", default=None, metavar="URL")
+    p_restart.add_argument("--drop-dir", default=None)
     s = sub.add_parser("setup", help="install and launch Sonic Pi")
     s.add_argument("--yes", action="store_true", help="don't ask before installing")
 
@@ -377,11 +435,9 @@ def main(argv=None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     if not args.cmd:
-        parser.print_help()
-        out("")
-        out(f"[dim]New here? Run[/] [bold]{CMD} setup[/][dim], then[/] "
-            f"[bold]{CMD} demo[/][dim].[/]")
-        return 0
+        # A person typed the bare command. Show them what is happening and
+        # what they can do about it, rather than a wall of flags.
+        return cmd_menu(args)
     return {
         "start": cmd_start,
         "say": cmd_say,
@@ -389,6 +445,10 @@ def main(argv=None) -> int:
         "doctor": cmd_doctor,
         "bench": cmd_bench,
         "test": cmd_test,
+        "stop": cmd_stop,
+        "status": cmd_status,
+        "menu": cmd_menu,
+        "restart": cmd_restart,
         "setup": cmd_setup,
     }[args.cmd](args)
 

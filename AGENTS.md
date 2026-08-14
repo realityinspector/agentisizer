@@ -54,6 +54,18 @@ Then leave it running in a background terminal:
 ./run-agentisizer.sh start
 ```
 
+**Stopping it is not Ctrl-C only.** If you started it, or a coordinator did,
+or it is in a terminal nobody can reach:
+
+```bash
+./run-agentisizer.sh status     # running? what is it doing?
+./run-agentisizer.sh stop       # works from any terminal
+./run-agentisizer.sh restart
+```
+
+Starting a second one is refused with an explanation rather than a socket
+traceback. If you want two, give the second a different `--port`.
+
 ### Verifying, properly
 
 `doctor` checks each layer separately and tells you which is broken:
