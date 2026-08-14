@@ -58,6 +58,15 @@ class TestStopping(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("nothing", msg.lower())
 
+    def test_stopping_a_free_port_never_finds_a_daemon_elsewhere(self):
+        """
+        This one bit for real. The pgrep fallback matched any running
+        `agentisizer.cli start`, so asking about a free port returned the pid
+        of the live daemon on another port — and this very test then killed
+        it. Nothing is running on a port nothing is listening on.
+        """
+        self.assertIsNone(process.daemon_pid(free_port()))
+
     def test_stopping_a_stranger_refuses_and_says_how_to_look(self):
         """Never kill a process we cannot identify as ours."""
         with socket.socket() as s:

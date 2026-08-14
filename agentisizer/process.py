@@ -50,12 +50,21 @@ def live_state(port: int) -> dict | None:
 
 def daemon_pid(port: int = 8912) -> int | None:
     """
-    The pid of a running daemon, by any means that works.
+    The pid of the daemon serving *this port*, by any means that works.
 
-    Tries the pidfile first because it is exact, then falls back to matching
-    the command line — the daemon may have been started by another session,
-    or by a coordinator, which is exactly the case that stranded us before.
+    The port check first is not a nicety. Without it the pgrep fallback
+    matches any `agentisizer.cli start` anywhere, so `stop --port 8913` would
+    happily kill the instance on 8912 — and it did: a test calling
+    `stop(<free port>)` to assert that stopping nothing is harmless reached
+    out and killed the live daemon. Nothing is running on a port nothing is
+    listening on, whatever pgrep has to say about it.
+
+    After that, the pidfile is tried first because it is exact, then the
+    command line, because the daemon may have been started by another session
+    or by a coordinator — the case that stranded us to begin with.
     """
+    if not port_busy(port):
+        return None
     try:
         pid = int(PIDFILE.read_text().strip())
         os.kill(pid, 0)                       # exists?
