@@ -85,12 +85,11 @@ def cmd_start(args) -> int:
 
     holder["app"] = app
     out("[bold cyan]The Agentisizer[/] — listening")
+    app.start()          # settles the backend before we claim which one it is
     for line in app.describe():
         out(f"  [dim]·[/] {line}")
     out(f"  [dim]·[/] interpreter: {app.interpreter.describe()}")
     out("  [dim]Ctrl-C to stop[/]\n")
-
-    app.start()
     try:
         while True:
             time.sleep(1)

@@ -129,5 +129,58 @@ class TestBackendChain(unittest.TestCase):
         self.assertEqual(i.backend, "heuristic")
         self.assertFalse(i.demote())
 
+class TestStartupProbe(unittest.TestCase):
+    """
+    select_backend settles the chain before any event arrives.
+
+    Measured on a real start with a stale key: event 1 spent a 401, event 2
+    spent another and demoted, event 3 burned a full 6s timeout waking a cold
+    Ollama, and only event 4 was actually classified. Three events mis-served
+    and a lying startup line, all because demotion happened under live traffic.
+    """
+
+    def _interp(self, openrouter_ok: bool, ollama_ok: bool):
+        import os
+        from unittest import mock
+        from agentisizer.interpret import Interpreter
+        with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "sk-test"}, clear=False), \
+             mock.patch.object(Interpreter, "_ollama_alive", lambda self: True), \
+             mock.patch.object(Interpreter, "_first_ollama_model", lambda self: "llama3.2:3b"):
+            i = Interpreter(backend="auto")
+        good = {"kind": "good", "intensity": 0.6, "summary": "ok"}
+        i._call_openrouter = (lambda t: good) if openrouter_ok else self._boom
+        i._call_ollama = (lambda t: good) if ollama_ok else self._boom
+        return i
+
+    @staticmethod
+    def _boom(_text):
+        raise RuntimeError("401")
+
+    def test_a_working_first_choice_is_kept(self):
+        i = self._interp(openrouter_ok=True, ollama_ok=True)
+        self.assertEqual(i.select_backend(), "openrouter")
+
+    def test_a_dead_key_settles_on_the_local_model_before_any_event(self):
+        i = self._interp(openrouter_ok=False, ollama_ok=True)
+        self.assertEqual(i.backend, "openrouter", "starts optimistic")
+        self.assertEqual(i.select_backend(), "ollama")
+        self.assertEqual(i.describe(), "ollama:llama3.2:3b",
+                         "what it reports must be what it will use")
+
+    def test_nothing_working_lands_on_the_rules(self):
+        i = self._interp(openrouter_ok=False, ollama_ok=False)
+        self.assertEqual(i.select_backend(), "heuristic")
+
+    def test_the_probe_does_not_consume_the_failure_budget(self):
+        """Probing must not leave the survivor one strike from demotion."""
+        i = self._interp(openrouter_ok=False, ollama_ok=True)
+        i.select_backend()
+        self.assertEqual(i._fails, 0)
+
+    def test_probing_is_idempotent(self):
+        i = self._interp(openrouter_ok=False, ollama_ok=True)
+        self.assertEqual(i.select_backend(), i.select_backend())
+
+
 if __name__ == "__main__":
     unittest.main()

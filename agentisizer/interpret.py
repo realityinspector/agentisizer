@@ -394,6 +394,36 @@ class Interpreter:
             via=self.backend,
         )
 
+    def select_backend(self) -> str:
+        """
+        Probe the chain once at startup, so the backend we name is the one we
+        will actually use — and so it is warm when the first event lands.
+
+        Without this, a dead API key costs twice at run time. The daemon
+        announces "interpreter: openrouter:…", which is a lie the moment the
+        key is stale; and the first two model-eligible events are spent
+        failing before it demotes. Worse, the *third* then pays a full timeout
+        waking a cold Ollama, because demotion happens under a live event
+        rather than before any arrive. Measured on a real start: 401, 401,
+        then a 6.00s timeout, and only the fourth event actually classified.
+
+        One probe per candidate at startup turns all of that into one honest
+        line and a warm model.
+        """
+        while self.backend in ("openrouter", "ollama"):
+            try:
+                raw = (self._call_openrouter("all tests passed")
+                       if self.backend == "openrouter"
+                       else self._call_ollama("all tests passed"))
+                if raw and raw.get("kind") in KINDS:
+                    self._fails = 0
+                    return self.backend
+            except Exception:
+                pass
+            if not self.demote():
+                break
+        return self.backend
+
     def interpret(self, text: str) -> Intent:
         """
         Rules first, model only when the rules have nothing to say.

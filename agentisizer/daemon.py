@@ -91,6 +91,10 @@ class Agentisizer:
                 pass      # one bad event must not stop the stream
 
     def start(self) -> None:
+        # Settle which brain we are using before any events arrive, so the
+        # line we print is true and the model is warm. See
+        # Interpreter.select_backend.
+        self.interpreter.select_backend()
         self.sonic.load_engine()
         time.sleep(1.5)               # let the live_loops come up
         self.conductor.start()
