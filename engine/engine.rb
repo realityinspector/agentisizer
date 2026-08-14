@@ -148,11 +148,25 @@ live_loop :listen_hit do
       end
     end
   when "bad"
-    # in-key dissonance: root plus a flat second. Tense, still placeable.
-    with_fx :distortion, distort: 0.3, mix: 0.4 do
-      use_synth :hollow
-      play cur_root, amp: 0.3, release: 1.2, cutoff: 65
-      play cur_root + 1, amp: 0.22, release: 1.2, cutoff: 60
+    # A flat second — same dissonance as before, still in key — but voiced an
+    # octave above the bass and plucked rather than swelled.
+    #
+    # The first version played the root itself through :hollow, which put it
+    # in exactly the register the bass and pad already occupy, with a soft
+    # attack. Measured against a busy mix it was inaudible: low-band energy at
+    # the accent was indistinguishable from the bars either side of it. An
+    # alert nobody can hear is not an alert, and this is now the sound a
+    # pending decision makes.
+    #
+    # The fix is separation, not volume — loudness is a budget. A transient is
+    # what makes something audible over a sustained bed, so this plucks, and
+    # the two notes are staggered so the clash is legible as an arrival rather
+    # than a chord.
+    with_fx :reverb, room: 0.4, mix: 0.25 do
+      use_synth :pluck
+      play cur_root + 12, amp: 0.55, release: 1.4
+      sleep 0.09
+      play cur_root + 13, amp: 0.45, release: 1.6
     end
   when "blocked"
     # low tritone thud — the floor dropping out
