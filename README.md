@@ -358,6 +358,7 @@ own virtualenv, so there is nothing to activate.
 | `./run-agentisizer.sh say "..."` | send one event (`--kind`, `--intensity`, `--source`) |
 | `./run-agentisizer.sh bench` | score the classifier against the keyword rules |
 | `./run-agentisizer.sh test` | run the test suite |
+| `./run-agentisizer.sh audible` | fire accents into the live mix and measure if they cut through |
 
 Global flags: `--backend {auto,openrouter,ollama,heuristic}`, `--model NAME`,
 `--port N`.
@@ -382,6 +383,17 @@ CLI work and are verified against Sonic Pi 5.0 — every number in this README
 was measured on a real run, and `tools/check_docs.py` runs with the tests so
 the commands and paths here cannot drift from the code. Rough edges:
 
+- **Whether the `bad` accent can be heard over a busy mix is unresolved**, and
+  the attempt to settle it is instructive. The original voicing measured as
+  inaudible; it was revoiced on reasoning alone (octave up, plucked) and that
+  reasoning has never been confirmed. `./run-agentisizer.sh audible` was built
+  to settle it and cannot yet: three different metrics on the same recordings
+  gave three different verdicts, and the fairest of them puts the *control* —
+  a bell everyone agrees is audible — below its own threshold. The harness
+  reports that rather than a number, which is the only part working as
+  intended. This matters because `bad` is what a pending decision sounds like.
+  The honest status is that a listener has not yet confirmed it, and a
+  listener is the ground truth this project is actually about.
 - The model still misses things the rules do too — "that did it" reads as
   `progress`, not `good`. 16/20 is a floor, not a ceiling;
   `./run-agentisizer.sh bench` is there to make improvements measurable

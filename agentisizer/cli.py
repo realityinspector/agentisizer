@@ -295,6 +295,14 @@ def cmd_restart(args) -> int:
     return cmd_start(args)
 
 
+def cmd_audible(args) -> int:
+    """Measure whether accents can be heard over the live mix."""
+    from pathlib import Path as _P
+    sys.path.insert(0, str(_P(__file__).resolve().parent.parent))
+    from tools.check_audible import main as audible_main
+    return audible_main(["--port", str(args.port)])
+
+
 def cmd_stop(args) -> int:
     ok, msg = process.stop(args.port)
     out(("[green]✓[/] " if ok else "[yellow]![/] ") + msg)
@@ -421,6 +429,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("stop", help="stop a running soundtrack, from anywhere")
     sub.add_parser("status", help="is it running, and what is it doing")
     sub.add_parser("menu", help="interactive menu")
+    sub.add_parser("audible", help="can the accents be heard over the mix?")
 
     p_restart = sub.add_parser("restart", help="stop it, then start it again")
     p_restart.add_argument("--graph", default=None, metavar="URL")
@@ -448,6 +457,7 @@ def main(argv=None) -> int:
         "stop": cmd_stop,
         "status": cmd_status,
         "menu": cmd_menu,
+        "audible": cmd_audible,
         "restart": cmd_restart,
         "setup": cmd_setup,
     }[args.cmd](args)
